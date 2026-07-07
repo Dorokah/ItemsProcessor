@@ -49,6 +49,17 @@
               "type": "count"
             }
           ],
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
+            }
+          ],
           "timeField": "@timestamp"
         }
       ],
@@ -92,6 +103,17 @@
             {
               "id": "1",
               "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
             }
           ],
           "timeField": "@timestamp"
@@ -139,6 +161,17 @@
               "type": "count"
             }
           ],
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
+            }
+          ],
           "timeField": "@timestamp"
         }
       ],
@@ -182,6 +215,17 @@
             {
               "id": "1",
               "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
             }
           ],
           "timeField": "@timestamp"
