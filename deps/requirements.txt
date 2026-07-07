@@ -1,9 +1,6 @@
 gunicorn
 confluent-kafka
 requests
-opentracing_instrumentation
-opentracing
-jaeger-client
 limits
 python_logstash_async
 pillow
@@ -11,10 +8,6 @@ happybase
 importlib_resources
 thriftpy2
 ply
-flask
-werkzeug
-itsdangerous
-click
+fastapi
+uvicorn
 jinja2
-markupsafe
-blinker

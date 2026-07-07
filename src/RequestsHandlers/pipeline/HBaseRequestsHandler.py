@@ -56,6 +56,9 @@ class HBaseRequestsHandler(RequestHandler):
                 data[b'info:species'] = str(pokemon['species']).encode('utf-8')
             if 'description' in pokemon:
                 data[b'info:description'] = str(pokemon['description']).encode('utf-8')
+            if 'image' in pokemon and isinstance(pokemon['image'], dict):
+                for k, val in pokemon['image'].items():
+                    data[f'info:image_{k}'.encode('utf-8')] = str(val).encode('utf-8')
 
             # name family
             if 'name' in pokemon and isinstance(pokemon['name'], dict):
