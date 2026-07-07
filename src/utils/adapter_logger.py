@@ -25,22 +25,18 @@ class AdapterLogger:
             'kafkaGroupId': config_provider.get_kafka_group_id(),
             'serviceName': config_provider.get_service_name(),
             'logstashHost': config_provider.get_logstash_host(),
-            'tracingResultsLogsEnable': config_provider.get_tracing_results_logs_enable(),
             'logstashPort': config_provider.get_logstash_port(),
             'elasticIndex': config_provider.get_elastic_index_name(),
             'serviceVersion': config_provider.get_service_version(),
             'consumeQueue': config_provider.get_consume_queue_name(),
             'isFirstService': config_provider.get_is_first_service(),
-            'algorithmName': config_provider.get_pipeline_name(),
-            'recognitionCPUQueue': config_provider.get_next_requests_cpu_queue_name(),
-            'recognitionGPUQueue': config_provider.get_next_requests_gpu_queue_name(),
+            'pipelineName': config_provider.get_pipeline_name(),
             'httpOutQueue': config_provider.get_results_queue_name(),
-            'imageServiceTimeout': config_provider.get_image_timeout(),
             'logstashEnable': config_provider.get_logstash_enable(),
             'tracingEnable': config_provider.get_tracing_enable(),
             'moduleName': f"{config_provider.get_request_handler_class_name()['moduleName']}",
             'className': f"{config_provider.get_request_handler_class_name()['className']}",
-            'algorithmServiceTimeout': config_provider.get_algorithm_service_post_timeout()
+            'serviceTimeout': config_provider.get_service_post_timeout()
         }
         return {k: v for k, v in config.items() if v != ''}
 
@@ -50,11 +46,11 @@ class AdapterLogger:
     def reset_aggregated_log(self):
         self.aggregated_log = {'serviceName': self.service_config.get('serviceName', 'Undefined'),
                                'serviceVersion': self.service_config.get('serviceVersion', 'Undefined'),
-                               'algorithmName': self.service_config.get('algorithmName', 'Algorithm'),
+                               'pipelineName': self.service_config.get('pipelineName', 'Pipeline'),
                                'requestId': 'n/a',
                                'entityId': 'n/a'}
 
-    def log_received_request(self, request, message="Received algorithm request"):
+    def log_received_request(self, request, message="Received request"):
         self.aggregated_log['requestId'] = request['requestId']
         if 'entityId' in request:
             self.aggregated_log['entityId'] = request['entityId']
@@ -82,20 +78,20 @@ class AdapterLogger:
             return self.aggregated_log['boundingBoxesAmount']
         return 0
 
-    def log_post_duration(self, algorithm_post_duration):
-        self.aggregated_log['algorithmPostDuration'] = algorithm_post_duration
+    def log_post_duration(self, post_duration):
+        self.aggregated_log['servicePostDuration'] = post_duration
 
     def log_threshold(self, threshold):
-        self.aggregated_log['algorithmThreshold'] = threshold
+        self.aggregated_log['serviceThreshold'] = threshold
 
     def log_common_response_data(self, response):
         self.aggregated_log['gpuId'] = int(response.headers['Gpu-Id'])
-        self.aggregated_log['algorithmDuration'] = float(response.headers['algorithm-Duration'])
-        self.aggregated_log['algorithmFullDuration'] = float(response.headers['algorithm-Full-Duration'])
+        self.aggregated_log['serviceDuration'] = float(response.headers['Service-Duration'])
+        self.aggregated_log['serviceFullDuration'] = float(response.headers['Service-Full-Duration'])
 
     def log_batch_data(self, response):
-        if 'Algorithm-Batch-Duration' in response.headers:
-            self.aggregated_log['algorithmBatchDuration'] = float(response.headers['Algorithm-Batch-Duration'])
+        if 'Service-Batch-Duration' in response.headers:
+            self.aggregated_log['serviceBatchDuration'] = float(response.headers['Service-Batch-Duration'])
         if 'Batch-Size' in response.headers:
             self.aggregated_log['batchSize'] = int(response.headers['Batch-Size'])
 
@@ -108,7 +104,7 @@ class AdapterLogger:
         return "No_trace_ID"
 
     def is_request_unsuccessful(self):
-        return self.aggregated_log['statusType'] == 'algorithmError'
+        return self.aggregated_log['statusType'] == 'processingError'
 
     def log_results(self, results):
         self.aggregated_log['results'] = results
@@ -127,16 +123,16 @@ class AdapterLogger:
     def log_success_logstash(self, request_start_timestamp):
         success_msg = "Successfully processed"
         self.logger.info(f"{success_msg} requestId: {self.aggregated_log['requestId']}")
-        self.aggregated_log['statusType'] = 'algorithmSuccess'
+        self.aggregated_log['statusType'] = 'processingSuccess'
         self.aggregated_log['adapterDuration'] = time.time() - request_start_timestamp
         if self.service_config.get('tracingEnable', False) and self.service_config.get('tracingResultsLogsEnable', False):
             self.tracer.active_span.log_kv({**self.aggregated_log, 'message': success_msg})
         self.logstash_logger.log(success_msg, self.aggregated_log)
 
     def log_error(self, exception_message, request_start_timestamp, traceback=None):
-        self.logger.error(f"algorithmError requestId: {self.aggregated_log['requestId']}")
+        self.logger.error(f"processingError requestId: {self.aggregated_log['requestId']}")
         self.logger.error(exception_message)
-        self.aggregated_log['statusType'] = 'algorithmError'
+        self.aggregated_log['statusType'] = 'processingError'
         self.aggregated_log['exception'] = exception_message
         if traceback:
             self.logger.error(traceback)
@@ -157,7 +153,3 @@ class AdapterLogger:
 
     def set_logstash_handler(self):
         self.logstash_logger.set_logstash_handler()
-
-
-AlgorithmAdapterLogger = AdapterLogger
-

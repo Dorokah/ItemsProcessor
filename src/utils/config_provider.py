@@ -122,8 +122,13 @@ def get_image_timeout():
     return os.environ.get('GET_IMAGE_TIMEOUT', 10)
 
 
+def get_service_post_timeout():
+    return int(os.environ.get('SERVICE_TIMEOUT', '30'))
+
+
+# Kept for backward compatibility
 def get_algorithm_service_post_timeout():
-    return int(os.environ.get('ALGORITHM_SERVICE_TIMEOUT', '30'))
+    return get_service_post_timeout()
 
 
 def get_image_minimum_width():

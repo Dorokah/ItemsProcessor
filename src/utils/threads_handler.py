@@ -1,5 +1,5 @@
 import threading
-from src.utils.adapter_logger import AlgorithmAdapterLogger
+from src.utils.adapter_logger import AdapterLogger
 from importlib import import_module
 
 
@@ -14,12 +14,12 @@ class ThreadsHandler:
         self.rh_import_class = request_handler_import_class
 
     def _do_work(self, message):
-        algorithm_adapter_logger = AlgorithmAdapterLogger()
+        adapter_logger = AdapterLogger()
         request_handler_class = getattr(self.rh_module, self.rh_import_class)
-        requests_handler = request_handler_class(algorithm_adapter_logger)
-        requests_handler.handle_algo_request(self.producer, self.consumer, message)
+        requests_handler = request_handler_class(adapter_logger)
+        requests_handler.handle_request(self.producer, self.consumer, message)
         if self.is_sigterm_received:
-            algorithm_adapter_logger.log_sigterm_received()
+            adapter_logger.log_sigterm_received()
 
     def on_message(self, message):
         self._remove_finished_threads()

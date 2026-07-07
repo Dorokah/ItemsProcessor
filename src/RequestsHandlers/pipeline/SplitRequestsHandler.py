@@ -11,7 +11,7 @@ class SplitRequestsHandler(RequestHandler):
         self.publish_topic = config_provider.get_publish_queue_name()
 
     @traced_consumer
-    def handle_algo_request(self, producer, consumer, message):
+    def handle_request(self, producer, consumer, message):
         body = message.value()
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()
@@ -21,13 +21,13 @@ class SplitRequestsHandler(RequestHandler):
             if not isinstance(pokedex, list):
                 self.adapter_logger.info("Incoming pokedex payload is not a JSON list!")
                 return
-            
+
             total_pokemon = len(pokedex)
             self.adapter_logger.info(f"Splitting pokedex of size {total_pokemon} into individual messages")
             for idx, pokemon in enumerate(pokedex):
                 pokemon_str = json.dumps(pokemon)
                 key_str = str(pokemon.get('id', ''))
-                
+
                 producer.produce(
                     topic=self.publish_topic,
                     value=pokemon_str.encode('utf-8'),
@@ -39,6 +39,6 @@ class SplitRequestsHandler(RequestHandler):
 
             producer.flush()
             self.adapter_logger.log_success_logstash(start_timestamp)
-            
+
         except Exception as e:
             self.adapter_logger.log_error(str(e), start_timestamp)

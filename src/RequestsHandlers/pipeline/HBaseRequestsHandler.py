@@ -15,7 +15,7 @@ class HBaseRequestsHandler(RequestHandler):
         self.publish_topic = config_provider.get_publish_queue_name()
 
     @traced_consumer
-    def handle_algo_request(self, producer, consumer, message):
+    def handle_request(self, producer, consumer, message):
         body = message.value()
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()

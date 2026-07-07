@@ -14,30 +14,30 @@ min_image_width = config_provider.get_image_minimum_width()
 min_image_height = config_provider.get_image_minimum_height()
 
 
-def get_image_and_metadata(algo_request):
-    algo_request, image_bytes = get_image(algo_request)
+def get_image_and_metadata(request):
+    request, image_bytes = get_image(request)
     metadata, image_bytes = extract_image_metadata(image_bytes)
     validate_image_dimensions_fit_for_processing(metadata["imageHeight"], metadata["imageWidth"])
-    return algo_request, image_bytes, metadata
+    return request, image_bytes, metadata
 
 
-def get_image(algo_request):
-    image_url = get_image_url(algo_request)
+def get_image(request):
+    image_url = get_image_url(request)
     get_image_start_timestamp = time.time()
     response = requests.get(image_url,
                             stream=True,
                             timeout=float(image_service_timeout))
-    algo_request['getImageDuration'] = time.time() - get_image_start_timestamp
+    request['getImageDuration'] = time.time() - get_image_start_timestamp
     if response.status_code != HTTPStatus.OK:
         raise Exception("Got error from image service")
-    return algo_request, response.content
+    return request, response.content
 
 
-def get_image_url(algo_request):
-    if 'entityId' in algo_request:
-        image_id = algo_request['entityId']
+def get_image_url(request):
+    if 'entityId' in request:
+        image_id = request['entityId']
         return image_service_url.format(image_id)
-    return algo_request['imageFullUrl']
+    return request['imageFullUrl']
 
 
 def extract_image_metadata(image_bytes):

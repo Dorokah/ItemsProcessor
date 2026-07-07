@@ -12,7 +12,7 @@ class WebhookRequestsHandler(RequestHandler):
         self.webhook_url = config_provider.get_webhook_url()
 
     @traced_consumer
-    def handle_algo_request(self, producer, consumer, message):
+    def handle_request(self, producer, consumer, message):
         body = message.value()
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()
@@ -21,7 +21,7 @@ class WebhookRequestsHandler(RequestHandler):
             status_payload = json.loads(body)
             pokemon_id = status_payload.get('id', '')
             status = status_payload.get('status', '')
-            
+
             # Setup logging metadata fields
             self.adapter_logger.add_field('requestId', f"webhook-{pokemon_id}")
             self.adapter_logger.add_field('entityId', pokemon_id)
@@ -44,10 +44,10 @@ class WebhookRequestsHandler(RequestHandler):
     def get_publish_queue(self):
         return None
 
-    def get_algorithm_post_data(self, algo_request, **kwargs):
+    def get_post_data(self, request, **kwargs):
         pass
 
-    def process_algorithm_result(self, algorithm_response):
+    def process_result(self, response):
         pass
 
     def request_pre_processing(self, body):
