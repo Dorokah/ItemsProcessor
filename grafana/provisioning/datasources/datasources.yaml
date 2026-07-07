@@ -33,4 +33,4 @@ datasources:
       logLevelField: "level"
       dataLinks:
         - field: "traceId"
-          url: '/explore?left={"datasource":"elasticsearch-ds","queries":[{"refId":"A","query":"traceId:\"$${__value.raw}\"","metrics":[{"id":"1","type":"logs"}],"bucketAggs":[]}],"range":{"from":"now-6h","to":"now"}}&right={"datasource":"tempo-ds","queries":[{"refId":"A","queryType":"traceql","query":"$${__value.raw}"}],"range":{"from":"now-6h","to":"now"}}'
+          url: '/explore?schemaVersion=1&panes={"es":{"datasource":"elasticsearch-ds","queries":[{"refId":"A","query":"traceId:\"$${__value.raw}\"","metrics":[{"id":"1","type":"logs"}],"bucketAggs":[]}],"range":{"from":"now-6h","to":"now"}},"tp":{"datasource":"tempo-ds","queries":[{"refId":"A","queryType":"traceql","query":"$${__value.raw}","datasource":{"type":"tempo","uid":"tempo-ds"},"limit":20,"tableType":"traces"}],"range":{"from":"now-6h","to":"now"}}}&orgId=1'
