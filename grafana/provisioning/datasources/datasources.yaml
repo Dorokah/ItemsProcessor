@@ -31,9 +31,3 @@ datasources:
       version: "7.0.0+"
       logMessageField: "message"
       logLevelField: "level"
-      derivedFields:
-        - datasourceUid: "tempo-ds"
-          matcherRegex: "traceId=([a-fA-F0-9]+)"
-          name: "traceId"
-          url: "${__value.raw}"
-          urlDisplayLabel: "View Trace"
