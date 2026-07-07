@@ -32,7 +32,9 @@ datasources:
       logMessageField: "message"
       logLevelField: "level"
       derivedFields:
-        - name: traceId
-          select: "traceId"
-          datasourceUid: "tempo-ds"
+        - datasourceUid: "tempo-ds"
+          matcherType: "label"
+          matcherRegex: "traceId"
+          name: "traceId"
           url: "${__value.raw}"
+          urlDisplayLabel: "View Trace"
