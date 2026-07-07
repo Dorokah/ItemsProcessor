@@ -1,0 +1,9 @@
+gunicorn
+pika
+requests
+opentracing_instrumentation
+opentracing
+jaeger-client
+limits
+python_logstash_async
+pillow
