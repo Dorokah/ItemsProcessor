@@ -214,20 +214,13 @@
           "metrics": [
             {
               "id": "1",
-              "type": "count"
-            }
-          ],
-          "bucketAggs": [
-            {
-              "field": "@timestamp",
-              "id": "2",
+              "type": "logs",
               "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              },
-              "type": "date_histogram"
+                "limit": "500"
+              }
             }
           ],
+          "bucketAggs": [],
           "timeField": "@timestamp"
         }
       ],
