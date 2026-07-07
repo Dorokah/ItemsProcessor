@@ -1,19 +1,4 @@
 services:
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
@@ -64,24 +49,107 @@ services:
       elasticsearch:
         condition: service_healthy
 
-  processor:
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_MESSAGE_MAX_BYTES=10000000
+
+  hbase:
+    image: harisekhon/hbase:1.4
+    container_name: hbase
+    ports:
+      - "9090:9090" # Thrift API
+      - "16010:16010" # Master Web UI
+
+  webhook-mock:
+    image: kennethreitz/httpbin
+    container_name: webhook-mock
+    ports:
+      - "8080:80"
+
+  splitter-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rabbit-processor
+    container_name: splitter-service
     depends_on:
-      rabbitmq:
-        condition: service_healthy
+      kafka:
+        condition: service_started
       logstash:
         condition: service_started
     environment:
-      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.GenericRequestsHandler
-      - RABBIT_HOST=rabbitmq
-      - RABBIT_PORT=5672
-      - RABBIT_USERNAME=guest
-      - RABBIT_PASSWORD=guest
-      - CONSUME_QUEUE=my_incoming_queue
-      - PUBLISH_QUEUE=my_outgoing_queue
+      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.SplitRequestsHandler
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CONSUME_TOPIC=pokedex-raw
+      - PUBLISH_TOPIC=pokemon-individual
+      - SERVICE_NAME=splitter
+      - LOGSTASH_ENABLE=True
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
+      - TRACING_ENABLE=True
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+
+  hbase-writer-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hbase-writer-service
+    depends_on:
+      kafka:
+        condition: service_started
+      hbase:
+        condition: service_started
+      logstash:
+        condition: service_started
+    environment:
+      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.HBaseRequestsHandler
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CONSUME_TOPIC=pokemon-individual
+      - PUBLISH_TOPIC=hbase-status
+      - HBASE_HOST=hbase
+      - HBASE_PORT=9090
+      - HBASE_TABLE_NAME=pokemon
+      - SERVICE_NAME=hbase-writer
+      - LOGSTASH_ENABLE=True
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
+      - TRACING_ENABLE=True
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+
+  webhook-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: webhook-service
+    depends_on:
+      kafka:
+        condition: service_started
+      webhook-mock:
+        condition: service_started
+      logstash:
+        condition: service_started
+    environment:
+      - REQUEST_HANDLER=src.RequestsHandlers.httpout.WebhookRequestsHandler
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CONSUME_TOPIC=hbase-status
+      - WEBHOOK_URL=http://webhook-mock/post
+      - SERVICE_NAME=webhook
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044

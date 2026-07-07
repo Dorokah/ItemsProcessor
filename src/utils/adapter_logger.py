@@ -21,9 +21,8 @@ class AdapterLogger:
     @staticmethod
     def _get_service_config():
         config = {
-            'rabbitHost': config_provider.get_rabbit_host(),
-            'rabbitUsername': config_provider.get_rabbit_username(),
-            'rabbitPrefetch': config_provider.get_rabbit_prefetch(),
+            'kafkaBootstrapServers': config_provider.get_kafka_bootstrap_servers(),
+            'kafkaGroupId': config_provider.get_kafka_group_id(),
             'serviceName': config_provider.get_service_name(),
             'logstashHost': config_provider.get_logstash_host(),
             'tracingResultsLogsEnable': config_provider.get_tracing_results_logs_enable(),

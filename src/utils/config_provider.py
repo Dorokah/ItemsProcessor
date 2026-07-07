@@ -57,47 +57,48 @@ def get_enable_results_logging():
     return return_true_by_str(os.environ.get('ENABLE_RESULTS_LOGGING', ""))
 
 
-#  Rabbit configs:
-def get_rabbit_host():
-    return os.environ.get('RABBIT_HOST', 'localhost')
+#  Kafka configs:
+def get_kafka_bootstrap_servers():
+    return os.environ.get('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
 
 
-def get_rabbit_port():
-    return os.environ.get('RABBIT_PORT', '5672')
+def get_kafka_group_id():
+    return os.environ.get('KAFKA_GROUP_ID', 'processor-group')
 
 
-def get_rabbit_vhost():
-    return os.environ.get('RABBIT_VHOST', '/')
+#  HBase configs:
+def get_hbase_host():
+    return os.environ.get('HBASE_HOST', 'localhost')
 
 
-def get_rabbit_username():
-    return os.environ.get('RABBIT_USERNAME', 'guest')
+def get_hbase_port():
+    return int(os.environ.get('HBASE_PORT', '9090'))
 
 
-def get_rabbit_password():
-    return os.environ.get('RABBIT_PASSWORD', 'guest')
+def get_hbase_table_name():
+    return os.environ.get('HBASE_TABLE_NAME', 'pokemon')
 
 
-def get_rabbit_max_priorities():
-    return os.environ.get('MAX_PRIORITIES', 255)
+#  Webhook configs:
+def get_webhook_url():
+    return os.environ.get('WEBHOOK_URL', 'http://localhost:8080/webhook')
 
 
-#  Rabbit Queues:
+#  Kafka Topics (mapped to queue names for compatibility):
 def get_results_queue_name():
-    return os.environ.get('RESULTS_QUEUE', "results")
+    return os.environ.get('RESULTS_TOPIC', "results")
 
 
 def get_consume_queue_name():
-    return os.environ.get('CONSUME_QUEUE', "")
+    return os.environ.get('CONSUME_TOPIC', "")
 
 
 def get_publish_queue_name():
-    return os.environ.get('PUBLISH_QUEUE', "")
+    return os.environ.get('PUBLISH_TOPIC', "")
 
 
 def get_queues_to_declare_names():
-    queues_list = [get_consume_queue_name(), get_publish_queue_name()]
-    return queues_list
+    return [get_consume_queue_name(), get_publish_queue_name()]
 
 
 def get_rabbit_prefetch():

@@ -1,5 +1,5 @@
 gunicorn
-pika
+confluent-kafka
 requests
 opentracing_instrumentation
 opentracing
@@ -7,3 +7,7 @@ jaeger-client
 limits
 python_logstash_async
 pillow
+happybase
+importlib_resources
+thriftpy2
+ply

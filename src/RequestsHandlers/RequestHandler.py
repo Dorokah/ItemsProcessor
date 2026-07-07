@@ -20,9 +20,10 @@ class RequestHandler(abc.ABC):
         self.tracer = global_tracer()
 
     @traced_consumer
-    def handle_algo_request(self, connection, ch, method, properties, body):
+    def handle_algo_request(self, producer, consumer, message):
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()
+        body = message.value()
         try:
             result_body = self.perform_adapter_actions(body, start_timestamp)
         except RestException as algorithm_exception:
@@ -33,9 +34,11 @@ class RequestHandler(abc.ABC):
                                           start_timestamp,
                                           traceback=str(traceback.format_exc()))
             result_body = result_builder.create_error_result(self.adapter_logger.get_aggregated_log())
-        publish_queue = self.get_publish_queue()
-        self.adapter_logger.info(f"Sending to queue: {publish_queue}")
-        self.publish_and_ack(ch, publish_queue, connection, method, properties, result_body)
+        
+        publish_topic = self.get_publish_queue()
+        if publish_topic:
+            self.adapter_logger.info(f"Sending to topic: {publish_topic}")
+            self.publish_and_ack(producer, publish_topic, consumer, message, result_body)
 
     def perform_adapter_actions(self, body, request_start_timestamp):
         request, image_bytes = self.request_pre_processing(body)
@@ -54,16 +57,18 @@ class RequestHandler(abc.ABC):
             self.adapter_logger.log_results(algo_result['results'])
         return algo_result
 
-    def publish_and_ack(self, ch, queue_name, connection, method, properties, result_body):
+    def publish_and_ack(self, producer, topic_name, consumer, message, result_body):
+        headers = message.headers() or []
         if self.is_first_service:
-            self.tracer.inject(self.tracer.active_span.context, Format.TEXT_MAP, properties.headers)
-        publish_callback = functools.partial(self.publish_results, queue_name, ch, result_body, properties)
-        connection.add_callback_threadsafe(publish_callback)
-        self.ack(ch, connection, method)
+            headers_dict = {k: v.decode('utf-8') if isinstance(v, bytes) else v for k, v in headers}
+            self.tracer.inject(self.tracer.active_span.context, Format.TEXT_MAP, headers_dict)
+            headers = [(k, str(v).encode('utf-8')) for k, v in headers_dict.items()]
 
-    def ack(self, ch, connection, method):
-        ack_callback = functools.partial(self.ack_message, ch, method.delivery_tag)
-        connection.add_callback_threadsafe(ack_callback)
+        val_bytes = result_body.encode('utf-8') if isinstance(result_body, str) else result_body
+        key_bytes = message.key()
+
+        producer.produce(topic=topic_name, value=val_bytes, key=key_bytes, headers=headers)
+        producer.poll(0)
 
     # ----- Optional Implementations -----#
 
@@ -80,20 +85,6 @@ class RequestHandler(abc.ABC):
         raise NotImplementedError()
 
     # ----- Static methods -----#
-
-    @staticmethod
-    def publish_results(publish_queue, ch, result_body, properties):
-        if 'customResultsQueue' in properties.headers and publish_queue == 'results':
-            publish_queue = properties.headers['customResultsQueue']
-        ch.basic_publish(routing_key=publish_queue,
-                         exchange='',
-                         properties=properties,
-                         body=result_body)
-
-    @staticmethod
-    def ack_message(ch, delivery_tag):
-        if ch.is_open:
-            ch.basic_ack(delivery_tag=delivery_tag)
 
     @staticmethod
     def validate_algorithm_response(status_code, algorithm_result):
