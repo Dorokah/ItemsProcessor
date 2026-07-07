@@ -157,5 +157,21 @@ services:
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6831
 
+  hbase-browser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hbase-browser
+    depends_on:
+      hbase:
+        condition: service_started
+    ports:
+      - "8081:8081"
+    environment:
+      - HBASE_HOST=hbase
+      - HBASE_PORT=9090
+      - HBASE_TABLE_NAME=pokemon
+    entrypoint: ["python3", "src/hbase_browser.py"]
+
 volumes:
   elasticsearch-data:

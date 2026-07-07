@@ -11,3 +11,10 @@ happybase
 importlib_resources
 thriftpy2
 ply
+flask
+werkzeug
+itsdangerous
+click
+jinja2
+markupsafe
+blinker
