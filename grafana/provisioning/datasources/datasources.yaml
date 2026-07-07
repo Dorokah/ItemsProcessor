@@ -31,3 +31,8 @@ datasources:
       version: "7.0.0+"
       logMessageField: "message"
       logLevelField: "level"
+      derivedFields:
+        - name: traceId
+          select: "traceId"
+          datasourceUid: "tempo-ds"
+          url: "${__value.raw}"

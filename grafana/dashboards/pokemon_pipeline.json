@@ -24,170 +24,243 @@
     {
       "collapsed": false,
       "gridPos": {
-        "h": 5,
-        "w": 8,
+        "h": 1,
+        "w": 24,
         "x": 0,
         "y": 0
       },
-      "id": 1,
-      "title": "Ingested Pokémon",
-      "type": "stat",
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "elasticsearch-ds"
-      },
-      "targets": [
+      "id": 10,
+      "title": "Service Metrics: $service_name",
+      "type": "row",
+      "repeat": "service_name",
+      "panels": [
         {
+          "id": 11,
+          "title": "Processed Items",
+          "type": "stat",
           "datasource": {
             "type": "elasticsearch",
             "uid": "elasticsearch-ds"
           },
-          "query": "statusType:\"algorithmSuccess\" AND serviceName:\"hbase-writer\"",
-          "metrics": [
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 0,
+            "y": 1
+          },
+          "targets": [
             {
-              "id": "1",
-              "type": "count"
-            }
-          ],
-          "bucketAggs": [
-            {
-              "field": "@timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "elasticsearch-ds"
               },
-              "type": "date_histogram"
+              "query": "serviceName:\"$service_name\"",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "count"
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "2",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "timeField": "@timestamp"
             }
           ],
-          "timeField": "@timestamp"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "sum"
-          ],
-          "fields": "",
-          "values": false
-        }
-      }
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 0
-      },
-      "id": 2,
-      "title": "Webhook Deliveries",
-      "type": "stat",
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "elasticsearch-ds"
-      },
-      "targets": [
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
         {
+          "id": 12,
+          "title": "Success Count",
+          "type": "stat",
           "datasource": {
             "type": "elasticsearch",
             "uid": "elasticsearch-ds"
           },
-          "query": "statusType:\"algorithmSuccess\" AND serviceName:\"webhook\"",
-          "metrics": [
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 6,
+            "y": 1
+          },
+          "targets": [
             {
-              "id": "1",
-              "type": "count"
-            }
-          ],
-          "bucketAggs": [
-            {
-              "field": "@timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "elasticsearch-ds"
               },
-              "type": "date_histogram"
+              "query": "serviceName:\"$service_name\" AND statusType:\"algorithmSuccess\"",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "count"
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "2",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "timeField": "@timestamp"
             }
           ],
-          "timeField": "@timestamp"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "sum"
-          ],
-          "fields": "",
-          "values": false
-        }
-      }
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 16,
-        "y": 0
-      },
-      "id": 3,
-      "title": "Processing Errors",
-      "type": "stat",
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "elasticsearch-ds"
-      },
-      "targets": [
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
         {
+          "id": 13,
+          "title": "Failure Count",
+          "type": "stat",
           "datasource": {
             "type": "elasticsearch",
             "uid": "elasticsearch-ds"
           },
-          "query": "statusType:\"algorithmError\"",
-          "metrics": [
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 1
+          },
+          "targets": [
             {
-              "id": "1",
-              "type": "count"
-            }
-          ],
-          "bucketAggs": [
-            {
-              "field": "@timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "elasticsearch-ds"
               },
-              "type": "date_histogram"
+              "query": "serviceName:\"$service_name\" AND statusType:\"algorithmError\"",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "count"
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "2",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "timeField": "@timestamp"
             }
           ],
-          "timeField": "@timestamp"
-        }
-      ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "textMode": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "sum"
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 14,
+          "title": "Avg Duration",
+          "type": "stat",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-ds"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 1
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "elasticsearch-ds"
+              },
+              "query": "serviceName:\"$service_name\"",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "avg",
+                  "field": "adapterDuration"
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "2",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "timeField": "@timestamp"
+            }
           ],
-          "fields": "",
-          "values": false
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            }
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "textMode": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "mean"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
         }
-      }
+      ]
     },
     {
       "collapsed": false,
@@ -195,10 +268,10 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 20
       },
-      "id": 4,
-      "title": "Processing Log Stream",
+      "id": 20,
+      "title": "Filtered Log Stream",
       "type": "logs",
       "datasource": {
         "type": "elasticsearch",
@@ -210,7 +283,7 @@
             "type": "elasticsearch",
             "uid": "elasticsearch-ds"
           },
-          "query": "*",
+          "query": "serviceName:($service_name)",
           "metrics": [
             {
               "id": "1",
@@ -236,5 +309,28 @@
   "schemaVersion": 39,
   "title": "RabbitProcessor Overview",
   "uid": "rabbitprocessor-overview",
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "elasticsearch-ds"
+        },
+        "definition": "{\"find\": \"terms\", \"field\": \"serviceName.keyword\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "service_name",
+        "options": [],
+        "query": "{\"find\": \"terms\", \"field\": \"serviceName.keyword\"}",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
   "version": 1
 }
