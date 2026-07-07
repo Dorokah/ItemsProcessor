@@ -30,8 +30,7 @@ def init_tracer():
             validate=True
         )
         install_all_patches()
-        tracer = config.initialize_tracer()
-        print(f"Tracer initialized successfully: {tracer}", flush=True)
+        config.initialize_tracer()
 
 
 def traced_consumer(func=None, name=None):
@@ -46,7 +45,6 @@ def traced_consumer(func=None, name=None):
     def decorator(self, producer, consumer, message):
         if tracing_enabled:
             tracer = opentracing.global_tracer()
-            print(f"Active global tracer in decorator: {tracer}", flush=True)
             references = None
             headers = message.headers()
             if headers:
