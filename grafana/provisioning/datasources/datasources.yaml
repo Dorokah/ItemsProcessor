@@ -5,4 +5,29 @@ datasources:
     type: tempo
     access: proxy
     url: http://tempo:3200
+    uid: tempo-ds
     isDefault: true
+    jsonData:
+      nodeGraph:
+        enabled: true
+      tracesToLogsV2:
+        datasourceUid: 'elasticsearch-ds'
+        spanStartTimeShift: '-1m'
+        spanEndTimeShift: '1m'
+        tags: [{ key: 'service.name', value: 'serviceName' }]
+        filterByTraceID: true
+        filterBySpanID: false
+
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    uid: elasticsearch-ds
+    isDefault: false
+    jsonData:
+      timeField: "@timestamp"
+      index: "rabbitprocessor-*"
+      database: "[rabbitprocessor-]*"
+      version: "7.0.0+"
+      logMessageField: "message"
+      logLevelField: "level"

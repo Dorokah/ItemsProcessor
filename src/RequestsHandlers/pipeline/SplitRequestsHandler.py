@@ -15,6 +15,7 @@ class SplitRequestsHandler(RequestHandler):
         body = message.value()
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()
+        self.adapter_logger.log_trace_id()
         try:
             pokedex = json.loads(body)
             if not isinstance(pokedex, list):

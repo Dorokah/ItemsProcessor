@@ -19,6 +19,7 @@ class HBaseRequestsHandler(RequestHandler):
         body = message.value()
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()
+        self.adapter_logger.log_trace_id()
         try:
             pokemon = json.loads(body)
             pokemon_id = str(pokemon.get('id', ''))

@@ -16,6 +16,7 @@ class WebhookRequestsHandler(RequestHandler):
         body = message.value()
         start_timestamp = time.time()
         self.adapter_logger.reset_aggregated_log()
+        self.adapter_logger.log_trace_id()
         try:
             status_payload = json.loads(body)
             pokemon_id = status_payload.get('id', '')
