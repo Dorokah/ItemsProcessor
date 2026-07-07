@@ -31,6 +31,12 @@ class LogstashLogger:
         if not log_dict:
             log_dict = {}
         log_dict['project'] = self.service_name
+        
+        # Append traceId to the message text for Grafana derivedFields matching!
+        trace_id = log_dict.get('traceId')
+        if trace_id and trace_id != 'No_trace_ID':
+            message = f"{message} | traceId={trace_id}"
+            
         self.logger.info(f"Sending to elastic the log: {log_dict}")
         if self.isEnabled:
             if is_info:

@@ -33,8 +33,7 @@ datasources:
       logLevelField: "level"
       derivedFields:
         - datasourceUid: "tempo-ds"
-          matcherType: "label"
-          matcherRegex: "traceId"
+          matcherRegex: "traceId=([a-fA-F0-9]+)"
           name: "traceId"
           url: "${__value.raw}"
           urlDisplayLabel: "View Trace"
