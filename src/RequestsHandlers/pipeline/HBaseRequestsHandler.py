@@ -7,8 +7,8 @@ from src.utils.tracer import traced_consumer, inject_trace_headers
 
 
 class HBaseRequestsHandler(RequestHandler):
-    def __init__(self, adapter_logger):
-        super().__init__(adapter_logger)
+    def __init__(self, service_logger):
+        super().__init__(service_logger)
         self.hbase_host = config_provider.get_hbase_host()
         self.hbase_port = config_provider.get_hbase_port()
         self.table_name = config_provider.get_hbase_table_name()
@@ -18,17 +18,17 @@ class HBaseRequestsHandler(RequestHandler):
     def handle_request(self, producer, consumer, message):
         body = message.value()
         start_timestamp = time.time()
-        self.adapter_logger.reset_aggregated_log()
-        self.adapter_logger.log_trace_id()
+        self.service_logger.reset_aggregated_log()
+        self.service_logger.log_trace_id()
         try:
             pokemon = json.loads(body)
             pokemon_id = str(pokemon.get('id', ''))
             if not pokemon_id:
                 raise Exception("Missing 'id' in Pokemon record")
 
-            self.adapter_logger.add_field('requestId', f"hbase-{pokemon_id}")
-            self.adapter_logger.add_field('entityId', pokemon_id)
-            self.adapter_logger.info(f"Writing Pokemon ID {pokemon_id} to HBase")
+            self.service_logger.add_field('requestId', f"hbase-{pokemon_id}")
+            self.service_logger.add_field('entityId', pokemon_id)
+            self.service_logger.info(f"Writing Pokemon ID {pokemon_id} to HBase")
 
             # Connect to HBase
             connection = happybase.Connection(host=self.hbase_host, port=self.hbase_port)
@@ -46,7 +46,7 @@ class HBaseRequestsHandler(RequestHandler):
             }
             table_name_bytes = self.table_name.encode('utf-8')
             if table_name_bytes not in tables:
-                self.adapter_logger.info(f"Creating HBase table: {self.table_name}")
+                self.service_logger.info(f"Creating HBase table: {self.table_name}")
                 connection.create_table(self.table_name, families)
 
             table = connection.table(self.table_name)
@@ -107,7 +107,7 @@ class HBaseRequestsHandler(RequestHandler):
                 )
                 producer.poll(0)
 
-            self.adapter_logger.log_success_logstash(start_timestamp)
+            self.service_logger.log_success_logstash(start_timestamp)
 
         except Exception as e:
             # Try to report failure if possible
@@ -129,4 +129,4 @@ class HBaseRequestsHandler(RequestHandler):
                     headers=inject_trace_headers(message.headers())
                 )
                 producer.poll(0)
-            self.adapter_logger.log_error(str(e), start_timestamp)
+            self.service_logger.log_error(str(e), start_timestamp)

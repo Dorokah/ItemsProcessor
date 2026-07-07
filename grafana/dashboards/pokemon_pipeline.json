@@ -224,7 +224,7 @@
                 {
                   "id": "1",
                   "type": "avg",
-                  "field": "adapterDuration"
+                  "field": "processingDuration"
                 }
               ],
               "bucketAggs": [

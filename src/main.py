@@ -17,7 +17,7 @@ tornado.stack_context = _mod
 import signal
 from confluent_kafka import Consumer, Producer
 from src.utils import config_provider
-from src.utils.adapter_logger import AdapterLogger
+from src.utils.service_logger import ServiceLogger
 from src.utils.threads_handler import ThreadsHandler
 from src.utils.tracer import init_tracer
 
@@ -25,7 +25,7 @@ from src.utils.tracer import init_tracer
 if __name__ == '__main__':
     init_tracer()
 
-    main_thread_logger = AdapterLogger()
+    main_thread_logger = ServiceLogger()
     main_thread_logger.log_service_config()
     main_thread_logger.set_logstash_handler()
 

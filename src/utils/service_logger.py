@@ -4,7 +4,7 @@ from opentracing import global_tracer
 from src.utils import config_provider, logstash_logger
 
 
-class AdapterLogger:
+class ServiceLogger:
     def __init__(self):
         logging.basicConfig(format=f'%(asctime)s | %(levelname)s: %(message)s', datefmt='[%I:%M:%S]')
         self.logger = logging.getLogger()
@@ -47,53 +47,18 @@ class AdapterLogger:
         self.aggregated_log = {'serviceName': self.service_config.get('serviceName', 'Undefined'),
                                'serviceVersion': self.service_config.get('serviceVersion', 'Undefined'),
                                'pipelineName': self.service_config.get('pipelineName', 'Pipeline'),
-                               'requestId': 'n/a',
-                               'entityId': 'n/a'}
+                               'requestId': 'n/a'}
 
     def log_received_request(self, request, message="Received request"):
         self.aggregated_log['requestId'] = request['requestId']
         if 'entityId' in request:
             self.aggregated_log['entityId'] = request['entityId']
-        if 'imageFullUrl' in request:
-            self.aggregated_log['imageFullUrl'] = request['imageFullUrl']
             logging.info(f"requestId: {request['requestId']} imageFullUrl: {request['imageFullUrl']}")
         logging.info(f"{message} requestId: {self.aggregated_log['requestId']}")
         self.logstash_logger.log(message, self.aggregated_log)
 
     def send_to_logstash(self, message=""):
         self.logstash_logger.log(message, self.aggregated_log)
-
-    def log_image_metadata(self, image_metadata):
-        self.aggregated_log['imageResolution'] = f"{image_metadata['imageWidth']}x{image_metadata['imageHeight']}"
-        self.aggregated_log = {**self.aggregated_log, **image_metadata}
-
-    def log_get_image_duration(self, get_image_duration):
-        self.aggregated_log['getImageDuration'] = get_image_duration
-
-    def log_boxes_amount(self, boxes_amount):
-        self.aggregated_log['boundingBoxesAmount'] = boxes_amount
-
-    def get_boxes_amount(self):
-        if 'boundingBoxesAmount' in self.aggregated_log:
-            return self.aggregated_log['boundingBoxesAmount']
-        return 0
-
-    def log_post_duration(self, post_duration):
-        self.aggregated_log['servicePostDuration'] = post_duration
-
-    def log_threshold(self, threshold):
-        self.aggregated_log['serviceThreshold'] = threshold
-
-    def log_common_response_data(self, response):
-        self.aggregated_log['gpuId'] = int(response.headers['Gpu-Id'])
-        self.aggregated_log['serviceDuration'] = float(response.headers['Service-Duration'])
-        self.aggregated_log['serviceFullDuration'] = float(response.headers['Service-Full-Duration'])
-
-    def log_batch_data(self, response):
-        if 'Service-Batch-Duration' in response.headers:
-            self.aggregated_log['serviceBatchDuration'] = float(response.headers['Service-Batch-Duration'])
-        if 'Batch-Size' in response.headers:
-            self.aggregated_log['batchSize'] = int(response.headers['Batch-Size'])
 
     def log_trace_id(self):
         span = self.tracer.active_span
@@ -112,19 +77,11 @@ class AdapterLogger:
     def log_sigterm_received(self):
         self.logger.info("Sigterm Received")
 
-    def log_detection_average_score(self, boxes, score_field_name, average_field_name):
-        bounding_boxes_amount = len(boxes)
-        if bounding_boxes_amount != 0:
-            score_sum = 0.0
-            for box in boxes:
-                score_sum += box[score_field_name]
-            self.aggregated_log[average_field_name] = score_sum / bounding_boxes_amount
-
     def log_success_logstash(self, request_start_timestamp):
         success_msg = "Successfully processed"
         self.logger.info(f"{success_msg} requestId: {self.aggregated_log['requestId']}")
         self.aggregated_log['statusType'] = 'processingSuccess'
-        self.aggregated_log['adapterDuration'] = time.time() - request_start_timestamp
+        self.aggregated_log['processingDuration'] = time.time() - request_start_timestamp
         if self.service_config.get('tracingEnable', False) and self.service_config.get('tracingResultsLogsEnable', False):
             self.tracer.active_span.log_kv({**self.aggregated_log, 'message': success_msg})
         self.logstash_logger.log(success_msg, self.aggregated_log)
@@ -136,8 +93,8 @@ class AdapterLogger:
         self.aggregated_log['exception'] = exception_message
         if traceback:
             self.logger.error(traceback)
-            self.aggregated_log['adapterErrorTraceback'] = traceback
-        self.aggregated_log['adapterDuration'] = time.time() - float(request_start_timestamp)
+            self.aggregated_log['errorTraceback'] = traceback
+        self.aggregated_log['processingDuration'] = time.time() - float(request_start_timestamp)
         if self.service_config.get('tracingEnable', False):
             self.tracer.active_span.log_kv({**self.aggregated_log, 'message': exception_message})
         self.logstash_logger.log(exception_message, self.aggregated_log, False)
