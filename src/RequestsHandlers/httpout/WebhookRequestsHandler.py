@@ -3,6 +3,7 @@ import requests
 import time
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
+from src.utils.tracer import traced_consumer
 
 
 class WebhookRequestsHandler(RequestHandler):
@@ -10,6 +11,7 @@ class WebhookRequestsHandler(RequestHandler):
         super().__init__(adapter_logger)
         self.webhook_url = config_provider.get_webhook_url()
 
+    @traced_consumer
     def handle_algo_request(self, producer, consumer, message):
         body = message.value()
         start_timestamp = time.time()

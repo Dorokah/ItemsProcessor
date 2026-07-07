@@ -10,12 +10,28 @@ from src.utils import config_provider
 tracing_enabled = config_provider.get_tracing_enable()
 
 
+import os
+
 def init_tracer():
     if tracing_enabled:
-        config = Config(config={'sampler': {'type': 'const', 'param': 1}}
-                        , service_name=config_provider.get_elastic_index_name(), validate=True)
+        agent_host = os.environ.get('JAEGER_AGENT_HOST', 'localhost')
+        agent_port = int(os.environ.get('JAEGER_AGENT_PORT', '6831'))
+        service_name = config_provider.get_elastic_index_name()
+        print(f"Initializing Jaeger tracer for service '{service_name}' targeting {agent_host}:{agent_port}...", flush=True)
+        config = Config(
+            config={
+                'sampler': {'type': 'const', 'param': 1},
+                'local_agent': {
+                    'reporting_host': agent_host,
+                    'reporting_port': agent_port
+                }
+            },
+            service_name=service_name,
+            validate=True
+        )
         install_all_patches()
-        config.initialize_tracer()
+        tracer = config.initialize_tracer()
+        print(f"Tracer initialized successfully: {tracer}", flush=True)
 
 
 def traced_consumer(func=None, name=None):
@@ -27,18 +43,26 @@ def traced_consumer(func=None, name=None):
         operation_name = func.__name__
 
     @functools.wraps(func)
-    def decorator(self, connection, ch, method, properties, body):
+    def decorator(self, producer, consumer, message):
         if tracing_enabled:
             tracer = opentracing.global_tracer()
+            print(f"Active global tracer in decorator: {tracer}", flush=True)
             references = None
-            context = tracer.extract(Format.TEXT_MAP, properties.headers)
-            if properties and properties.headers:
+            headers = message.headers()
+            if headers:
+                # Convert list of bytes tuples to string dictionary for opentracing
+                headers_dict = {
+                    k: (v.decode('utf-8') if isinstance(v, bytes) else str(v))
+                    for k, v in headers
+                }
+                context = tracer.extract(Format.TEXT_MAP, headers_dict)
                 if context:
                     references = opentracing.follows_from(context)
+            
             with tracer.start_active_span(operation_name, references=references):
-                func(self, connection, ch, method, properties, body)
+                return func(self, producer, consumer, message)
         else:
-            func(self, connection, ch, method, properties, body)
+            return func(self, producer, consumer, message)
     return decorator
 
 

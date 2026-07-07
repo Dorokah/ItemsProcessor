@@ -3,6 +3,7 @@ import json
 import time
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
+from src.utils.tracer import traced_consumer
 
 
 class HBaseRequestsHandler(RequestHandler):
@@ -13,6 +14,7 @@ class HBaseRequestsHandler(RequestHandler):
         self.table_name = config_provider.get_hbase_table_name()
         self.publish_topic = config_provider.get_publish_queue_name()
 
+    @traced_consumer
     def handle_algo_request(self, producer, consumer, message):
         body = message.value()
         start_timestamp = time.time()
