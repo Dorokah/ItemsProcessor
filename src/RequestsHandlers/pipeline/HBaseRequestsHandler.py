@@ -3,7 +3,7 @@ import json
 import time
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import traced_consumer, inject_trace_headers
 
 
 class HBaseRequestsHandler(RequestHandler):
@@ -102,7 +102,7 @@ class HBaseRequestsHandler(RequestHandler):
                     topic=self.publish_topic,
                     value=json.dumps(status_payload).encode('utf-8'),
                     key=pokemon_id.encode('utf-8'),
-                    headers=message.headers()
+                    headers=inject_trace_headers(message.headers())
                 )
                 producer.poll(0)
 
@@ -125,7 +125,7 @@ class HBaseRequestsHandler(RequestHandler):
                     topic=self.publish_topic,
                     value=json.dumps(status_payload).encode('utf-8'),
                     key=pokemon_id.encode('utf-8'),
-                    headers=message.headers()
+                    headers=inject_trace_headers(message.headers())
                 )
                 producer.poll(0)
             self.adapter_logger.log_error(str(e), start_timestamp)

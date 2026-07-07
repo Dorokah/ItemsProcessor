@@ -76,3 +76,31 @@ def get_span_id(tracer):
     if hasattr(span, 'span_id'):
         return format(span.span_id, 'x')
     return "No_span_ID"
+
+
+def inject_trace_headers(headers=None):
+    if not tracing_enabled:
+        return headers
+    
+    # Convert existing headers list to dict if present
+    headers_dict = {}
+    if headers:
+        if isinstance(headers, list):
+            headers_dict = {
+                k: (v.decode('utf-8') if isinstance(v, bytes) else str(v))
+                for k, v in headers
+            }
+        elif isinstance(headers, dict):
+            headers_dict = headers.copy()
+            
+    # Inject active tracing context
+    tracer = opentracing.global_tracer()
+    active_span = tracer.active_span
+    if active_span:
+        tracer.inject(active_span.context, Format.TEXT_MAP, headers_dict)
+        
+    # Convert dict back to list of tuples for confluent-kafka
+    return [
+        (k, (v.encode('utf-8') if isinstance(v, str) else v))
+        for k, v in headers_dict.items()
+    ]

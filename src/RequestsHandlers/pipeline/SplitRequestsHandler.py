@@ -2,7 +2,7 @@ import json
 import time
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import traced_consumer, inject_trace_headers
 
 
 class SplitRequestsHandler(RequestHandler):
@@ -31,7 +31,7 @@ class SplitRequestsHandler(RequestHandler):
                     topic=self.publish_topic,
                     value=pokemon_str.encode('utf-8'),
                     key=key_str.encode('utf-8'),
-                    headers=message.headers()
+                    headers=inject_trace_headers(message.headers())
                 )
                 if idx % 100 == 0:
                     producer.poll(0)
