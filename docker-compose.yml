@@ -1,12 +1,27 @@
 services:
-  jaeger:
-    image: jaegertracing/all-in-one:1.57
-    container_name: jaeger
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo/tempo.yaml" ]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
     ports:
-      - "16686:16686" # Web UI
-      - "6831:6831/udp" # Jaeger Agent (compact thrift protocol)
+      - "3200:3200"   # HTTP API
+      - "6831:6831/udp" # Jaeger thrift compact UDP
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning/datasources/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
     environment:
-      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    depends_on:
+      - tempo
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.3
@@ -101,7 +116,7 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_HOST=tempo
       - JAEGER_AGENT_PORT=6831
 
   hbase-writer-service:
@@ -129,7 +144,7 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_HOST=tempo
       - JAEGER_AGENT_PORT=6831
 
   webhook-service:
@@ -154,7 +169,7 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_HOST=tempo
       - JAEGER_AGENT_PORT=6831
 
   hbase-browser:
