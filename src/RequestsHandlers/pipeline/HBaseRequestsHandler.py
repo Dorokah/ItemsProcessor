@@ -47,7 +47,13 @@ class HBaseRequestsHandler(RequestHandler):
             table_name_bytes = self.table_name.encode('utf-8')
             if table_name_bytes not in tables:
                 self.service_logger.info(f"Creating HBase table: {self.table_name}")
-                connection.create_table(self.table_name, families)
+                try:
+                    connection.create_table(self.table_name, families)
+                except Exception as e:
+                    if 'TableExistsException' in str(e):
+                        self.service_logger.info(f"HBase table {self.table_name} already exists (created concurrently).")
+                    else:
+                        raise e
 
             table = connection.table(self.table_name)
 
