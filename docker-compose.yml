@@ -142,6 +142,8 @@ services:
       - HBASE_PORT=9090
       - HBASE_TABLE_NAME=pokemon
       - SERVICE_NAME=hbase-writer
+      - BATCH_SIZE=100
+      - BATCH_TIMEOUT_MS=500
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044

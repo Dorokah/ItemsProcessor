@@ -104,3 +104,26 @@ def inject_trace_headers(headers=None):
         (k, (v.encode('utf-8') if isinstance(v, str) else v))
         for k, v in headers_dict.items()
     ]
+
+
+from contextlib import contextmanager
+
+@contextmanager
+def trace_message(message, operation_name="process_message"):
+    if tracing_enabled:
+        tracer = opentracing.global_tracer()
+        references = None
+        headers = message.headers()
+        if headers:
+            headers_dict = {
+                k: (v.decode('utf-8') if isinstance(v, bytes) else str(v))
+                for k, v in headers
+            }
+            context = tracer.extract(Format.TEXT_MAP, headers_dict)
+            if context:
+                references = [opentracing.follows_from(context)]
+        
+        with tracer.start_active_span(operation_name, references=references) as scope:
+            yield scope
+    else:
+        yield None

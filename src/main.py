@@ -62,17 +62,25 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGTERM, threads_handler.signal_handler)
 
-    main_thread_logger.info("Starting message consumption loop")
+    batch_size = config_provider.get_batch_size()
+    batch_timeout = config_provider.get_batch_timeout()
+
+    main_thread_logger.info(f"Starting message consumption loop (batch_size={batch_size}, timeout={batch_timeout}s)")
     try:
         while not threads_handler.is_sigterm_received:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None:
+            msgs = consumer.consume(num_messages=batch_size, timeout=batch_timeout)
+            if not msgs:
                 continue
-            if msg.error():
-                main_thread_logger.logger.error(f"Kafka error: {msg.error()}")
-                continue
-            
-            threads_handler.on_message(msg)
+
+            valid_msgs = []
+            for msg in msgs:
+                if msg.error():
+                    main_thread_logger.logger.error(f"Kafka error: {msg.error()}")
+                    continue
+                valid_msgs.append(msg)
+
+            if valid_msgs:
+                threads_handler.on_batch(valid_msgs)
     finally:
         main_thread_logger.info("Closing Kafka consumer and flushing producer")
         consumer.close()
