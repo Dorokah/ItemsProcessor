@@ -331,73 +331,72 @@
               "sort": "none"
             }
           }
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
-      "id": 20,
-      "title": "Filtered Log Stream",
-      "type": "logs",
-      "datasource": {
-        "type": "elasticsearch",
-        "uid": "elasticsearch-ds"
-      },
-      "targets": [
+        },
         {
+          "id": 16,
+          "title": "Service Log Stream",
+          "type": "logs",
           "datasource": {
             "type": "elasticsearch",
             "uid": "elasticsearch-ds"
           },
-          "query": "serviceName:($service_name)",
-          "metrics": [
+          "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 13
+          },
+          "targets": [
             {
-              "id": "1",
-              "type": "logs",
-              "settings": {
-                "limit": "500"
-              }
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "elasticsearch-ds"
+              },
+              "query": "serviceName:\"$service_name\"",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "logs",
+                  "settings": {
+                    "limit": "500"
+                  }
+                }
+              ],
+              "bucketAggs": [],
+              "timeField": "@timestamp"
             }
           ],
-          "bucketAggs": [],
-          "timeField": "@timestamp"
-        }
-      ],
-      "fieldConfig": {
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "traceId"
-            },
-            "properties": [
+          "fieldConfig": {
+            "overrides": [
               {
-                "id": "links",
-                "value": [
+                "matcher": {
+                  "id": "byName",
+                  "options": "traceId"
+                },
+                "properties": [
                   {
-                    "title": "View Trace",
-                    "url": "http://localhost:3000/explore?schemaVersion=1&panes={\"tp\":{\"datasource\":\"tempo-ds\",\"queries\":[{\"refId\":\"A\",\"queryType\":\"traceql\",\"query\":\"$${__value.raw}\",\"datasource\":{\"type\":\"tempo\",\"uid\":\"tempo-ds\"},\"limit\":20,\"tableType\":\"traces\"}],\"range\":{\"from\":\"now-6h\",\"to\":\"now\"}}}&orgId=1",
-                    "targetBlank": true
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "View Trace",
+                        "url": "http://localhost:3000/explore?schemaVersion=1&panes={\"tp\":{\"datasource\":\"tempo-ds\",\"queries\":[{\"refId\":\"A\",\"queryType\":\"traceql\",\"query\":\"$${__value.raw}\",\"datasource\":{\"type\":\"tempo\",\"uid\":\"tempo-ds\"},\"limit\":20,\"tableType\":\"traces\"}],\"range\":{\"from\":\"now-6h\",\"to\":\"now\"}}}&orgId=1",
+                        "targetBlank": true
+                      }
+                    ]
                   }
                 ]
               }
             ]
+          },
+          "options": {
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "showTime": true,
+            "sortOrder": "Descending"
           }
-        ]
-      },
-      "options": {
-        "showLabels": true,
-        "wrapLogMessage": true,
-        "enableLogDetails": true,
-        "showTime": true,
-        "sortOrder": "Descending"
-      }
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
@@ -432,5 +431,5 @@
       }
     ]
   },
-  "version": 100
+  "version": 101
 }

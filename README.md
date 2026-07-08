@@ -172,8 +172,19 @@ This repository includes a full observability suite powered by the **LGTM** (Lok
 
 ### 3. Grafana Dashboard (Logs-to-Trace Navigation)
 * Grafana serves the `rabbitprocessor-overview` dashboard at `http://localhost:3000`.
+* **Dynamic Row Duplication**: The dashboard is built with a repeating row keyed to the `$service_name` template variable.
+  - Selecting **"All"** (default) or multi-selecting specific services in the top dropdown automatically repeats the row + all nested panels for each service.
+  - When you add a new service (e.g. `my-new-service` under `docker-compose.yml`), it starts sending telemetry containing `serviceName: "my-new-service"` to Logstash. Grafana's Elasticsearch query picks this up dynamically, automatically adding a new row with working metrics and logs for it!
+* **Nested Panel Rows**:
+  Each duplicated service row contains:
+  - **Processed Items**: Total messages processed.
+  - **Success Count**: Total successful runs.
+  - **Failure Count**: Total failed runs.
+  - **Avg Duration**: Average execution duration in seconds.
+  - **Processing Duration Percentiles**: A line chart showing p50, p75, p99, and p100 (max) values over time.
+  - **Service Log Stream**: Real-time log logs scoped precisely to that service.
 * **Correlated Exploration (Logs to Trace)**: 
-  Every log displayed in the dashboard's Log Stream panel includes an active `traceId` link. Clicking it opens a **new tab** directly in Grafana's Tempo Explore panel, rendering the complete distributed span waterfall tree for that specific transaction.
+  Every log line displayed in the Service Log Stream panel includes an active `traceId` link. Clicking it opens a **new tab** directly in Grafana's Tempo Explore panel, rendering the complete distributed span waterfall tree for that transaction.
 * The link is provisioned via the Elasticsearch datasource `dataLinks` configuration:
   ```yaml
   dataLinks:
