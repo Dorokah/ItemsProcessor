@@ -109,7 +109,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"$service_name\" AND statusType:\"algorithmSuccess\"",
+              "query": "serviceName:\"$service_name\" AND statusType:\"processingSuccess\"",
               "metrics": [
                 {
                   "id": "1",
@@ -164,7 +164,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"$service_name\" AND statusType:\"algorithmError\"",
+              "query": "serviceName:\"$service_name\" AND statusType:\"processingError\"",
               "metrics": [
                 {
                   "id": "1",

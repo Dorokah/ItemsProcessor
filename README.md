@@ -1,6 +1,6 @@
 # Rabbit Processor
 
-`RabbitProcessor` is a concurrent, multi-threaded RabbitMQ message processing adapter. It is designed to act as an orchestrator/bridge: consuming requests from RabbitMQ queues, retrieving target images/metadata from URLs, invoking algorithm request handlers, logging telemetry, and publishing results downstream or forwarding them to HTTP webhooks.
+`RabbitProcessor` is a concurrent, multi-threaded RabbitMQ message processor. It is designed to act as an orhcestrator/bridge: consuming requests from RabbitMQ queues, retrieving target images/metadata from URLs, invoking request handlers, logging telemetry, and publishing results downstream or forwarding them to HTTP webhooks.
 
 ## Architecture Overview
 
@@ -27,7 +27,7 @@ graph TD
 *   **[src/RequestsHandlers/pipeline/GenericRequestsHandler.py](file:///Users/dorokah/Documents/code/python/RabbitProcessor/src/RequestsHandlers/pipeline/GenericRequestsHandler.py)**: A pipeline handler implementation. It downloads requested images, validates their dimensions, and publishes results back to downstream queues.
 *   **[src/RequestsHandlers/httpout/HttpOutRequestsHandler.py](file:///Users/dorokah/Documents/code/python/RabbitProcessor/src/RequestsHandlers/httpout/HttpOutRequestsHandler.py)**: A pipeline outbound handler that posts results directly to external HTTP URLs (webhooks) specified in message headers.
 *   **[src/utils/image_provider.py](file:///Users/dorokah/Documents/code/python/RabbitProcessor/src/utils/image_provider.py)**: Utilities for making streaming HTTP requests to download images, parse format metadata using `Pillow`, and enforce minimum dimension limits.
-*   **[src/utils/adapter_logger.py](file:///Users/dorokah/Documents/code/python/RabbitProcessor/src/utils/adapter_logger.py)**: Aggregates structured log parameters during processing and forwards them to Logstash and Jaeger spans.
+*   **[src/utils/service_logger.py](file:///Users/dorokah/Documents/code/python/RabbitProcessor/src/utils/service_logger.py)**: Aggregates structured log parameters during processing and forwards them to Logstash and Jaeger spans.
 
 ---
 

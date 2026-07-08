@@ -3,7 +3,7 @@ import os
 
 #  Mandatory configs:
 def get_pipeline_name():
-    return os.environ.get('PIPELINE_NAME', 'Algorithm')
+    return os.environ.get('PIPELINE_NAME', 'Pipeline')
 
 
 def get_service_version():
