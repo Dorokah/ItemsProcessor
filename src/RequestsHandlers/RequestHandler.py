@@ -41,15 +41,15 @@ class RequestHandler(abc.ABC):
             self.publish_and_ack(producer, publish_topic, consumer, message, result_body)
 
     def perform_actions(self, body, request_start_timestamp):
-        request, image_bytes = self.request_pre_processing(body)
-        result = self.perform_service_call(request, image_bytes)
+        request = self.request_pre_processing(body)
+        result = self.perform_service_call(request)
         self.service_logger.log_success_logstash(request_start_timestamp)
         return result_builder.create_success_result(result, self.service_logger.get_aggregated_log())
 
     @traced_function
-    def perform_service_call(self, request, image_bytes):
+    def perform_service_call(self, request):
         post_start_timestamp = time.time()
-        response = {'boundingBox': ''}
+        response = {}
         post_duration = time.time() - post_start_timestamp
         self.service_logger.log_post_duration(post_duration)
         result = self.process_result(response)
@@ -91,7 +91,3 @@ class RequestHandler(abc.ABC):
         if status_code != HTTPStatus.OK:
             raise RestException(result)
 
-    @staticmethod
-    def validate_mandatory_fields(request):
-        if 'imageUrl' not in request:
-            raise Exception("Request does not have entityId or imageFullUrl field.")

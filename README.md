@@ -24,7 +24,6 @@ graph TD
     B --> C[src/utils/threads_handler.py]
     C -->|Spawn Concurrent Threads| D[Thread Pool]
     D -->|Executes request handler| E[src/RequestsHandlers/RequestHandler.py]
-    E -->|Pre-Process: Fetch Image| F[src/utils/image_provider.py]
     E -->|Execute Business Logic| G[Concrete Request Handler]
     G -->|Option A: Publish Downstream| A
     G -->|Option B: Forward to Webhook| H[External HTTP Endpoint]

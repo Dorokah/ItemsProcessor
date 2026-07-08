@@ -114,12 +114,6 @@ def get_next_requests_gpu_queue_name():
 
 
 #  Image processing configs:
-def get_image_service_url():
-    return os.environ.get('IMAGE_SERVICE_URL', '')
-
-
-def get_image_timeout():
-    return os.environ.get('GET_IMAGE_TIMEOUT', 10)
 
 
 def get_service_post_timeout():
@@ -129,14 +123,6 @@ def get_service_post_timeout():
 # Kept for backward compatibility
 def get_algorithm_service_post_timeout():
     return get_service_post_timeout()
-
-
-def get_image_minimum_width():
-    return int(os.environ.get('run_image_min_width', '5'))
-
-
-def get_image_minimum_height():
-    return int(os.environ.get('run_image_min_height', '5'))
 
 
 #  Jaeger support:

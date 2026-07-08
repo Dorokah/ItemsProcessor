@@ -53,7 +53,6 @@ class ServiceLogger:
         self.aggregated_log['requestId'] = request['requestId']
         if 'entityId' in request:
             self.aggregated_log['entityId'] = request['entityId']
-            logging.info(f"requestId: {request['requestId']} imageFullUrl: {request['imageFullUrl']}")
         logging.info(f"{message} requestId: {self.aggregated_log['requestId']}")
         self.logstash_logger.log(message, self.aggregated_log)
 
