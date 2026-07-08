@@ -259,6 +259,78 @@
               "values": false
             }
           }
+        },
+        {
+          "id": 15,
+          "title": "Processing Duration Percentiles",
+          "type": "timeseries",
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "elasticsearch-ds"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 5
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "elasticsearch",
+                "uid": "elasticsearch-ds"
+              },
+              "query": "serviceName:\"$service_name\"",
+              "metrics": [
+                {
+                  "id": "1",
+                  "type": "percentiles",
+                  "field": "processingDuration",
+                  "settings": {
+                    "percents": [
+                      "50",
+                      "75",
+                      "99",
+                      "100"
+                    ]
+                  }
+                }
+              ],
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "2",
+                  "settings": {
+                    "interval": "auto",
+                    "min_doc_count": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "timeField": "@timestamp"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth"
+              }
+            }
+          },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          }
         }
       ]
     },
