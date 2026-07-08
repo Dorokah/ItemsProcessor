@@ -248,3 +248,22 @@ docker compose ps
 # View service logs:
 docker compose logs -f splitter-service
 ```
+
+---
+
+## Running a Pipeline Test
+
+To trigger and verify a complete test run of the Pokemon pipeline (Pokedex splitting, database ingestion, and webhook status forward), use the automated pipeline test script:
+
+```bash
+# Execute the pipeline test run script
+./scripts/run_pipeline_test.sh
+```
+
+### What this script does:
+1. Verifies that all Docker containers are running properly.
+2. Copies the source `pokedex.json` payload from your local host into the `splitter-service` container.
+3. Invokes the `pokedex_producer.py` inside the container using `docker compose exec`.
+4. The producer publishes the Pokedex structure to the Kafka pipeline, triggering the Splitter, HBase writer, and Webhook status forwarders automatically.
+
+Open **Grafana** at `http://localhost:3000` to watch the processed logs and trace charts update in real-time.
