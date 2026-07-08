@@ -22,7 +22,7 @@
   "liveNow": false,
   "panels": [
     {
-      "collapsed": false,
+      "collapsed": true,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -432,5 +432,5 @@
       }
     ]
   },
-  "version": 99
+  "version": 100
 }
