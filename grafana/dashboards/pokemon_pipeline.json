@@ -30,8 +30,9 @@
         "y": 0
       },
       "id": 10,
-      "title": "Service Metrics: splitter",
+      "title": "Service Metrics: $service_name",
       "type": "row",
+      "repeat": "service_name",
       "panels": [
         {
           "id": 11,
@@ -53,7 +54,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"splitter\"",
+              "query": "serviceName:\"$service_name\"",
               "metrics": [
                 {
                   "id": "1",
@@ -108,7 +109,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"splitter\" AND statusType:\"processingSuccess\"",
+              "query": "serviceName:\"$service_name\" AND statusType:\"processingSuccess\"",
               "metrics": [
                 {
                   "id": "1",
@@ -163,7 +164,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"splitter\" AND statusType:\"processingError\"",
+              "query": "serviceName:\"$service_name\" AND statusType:\"processingError\"",
               "metrics": [
                 {
                   "id": "1",
@@ -218,7 +219,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"splitter\"",
+              "query": "serviceName:\"$service_name\"",
               "metrics": [
                 {
                   "id": "1",
@@ -279,631 +280,7 @@
                 "type": "elasticsearch",
                 "uid": "elasticsearch-ds"
               },
-              "query": "serviceName:\"splitter\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "percentiles",
-                  "field": "processingDuration",
-                  "settings": {
-                    "percents": [
-                      "50",
-                      "75",
-                      "99",
-                      "100"
-                    ]
-                  }
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "custom": {
-                "drawStyle": "line",
-                "lineInterpolation": "smooth"
-              }
-            }
-          },
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
-      "id": 20,
-      "title": "Service Metrics: hbase-writer",
-      "type": "row",
-      "panels": [
-        {
-          "id": 21,
-          "title": "Processed Items",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 0,
-            "y": 16
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"hbase-writer\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "count"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "sum"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 22,
-          "title": "Success Count",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 6,
-            "y": 16
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"hbase-writer\" AND statusType:\"processingSuccess\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "count"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "sum"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 23,
-          "title": "Failure Count",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 12,
-            "y": 16
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"hbase-writer\" AND statusType:\"processingError\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "count"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "sum"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 24,
-          "title": "Avg Duration",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 18,
-            "y": 16
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"hbase-writer\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "avg",
-                  "field": "processingDuration"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s"
-            }
-          },
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "mean"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 25,
-          "title": "Processing Duration Percentiles",
-          "type": "timeseries",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 24,
-            "x": 0,
-            "y": 20
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"hbase-writer\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "percentiles",
-                  "field": "processingDuration",
-                  "settings": {
-                    "percents": [
-                      "50",
-                      "75",
-                      "99",
-                      "100"
-                    ]
-                  }
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s",
-              "custom": {
-                "drawStyle": "line",
-                "lineInterpolation": "smooth"
-              }
-            }
-          },
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
-      "id": 30,
-      "title": "Service Metrics: webhook",
-      "type": "row",
-      "panels": [
-        {
-          "id": 31,
-          "title": "Processed Items",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 0,
-            "y": 31
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"webhook\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "count"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "sum"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 32,
-          "title": "Success Count",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 6,
-            "y": 31
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"webhook\" AND statusType:\"processingSuccess\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "count"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "sum"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 33,
-          "title": "Failure Count",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 12,
-            "y": 31
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"webhook\" AND statusType:\"processingError\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "count"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "sum"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 34,
-          "title": "Avg Duration",
-          "type": "stat",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 4,
-            "w": 6,
-            "x": 18,
-            "y": 31
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"webhook\"",
-              "metrics": [
-                {
-                  "id": "1",
-                  "type": "avg",
-                  "field": "processingDuration"
-                }
-              ],
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "2",
-                  "settings": {
-                    "interval": "auto",
-                    "min_doc_count": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "timeField": "@timestamp"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "unit": "s"
-            }
-          },
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "textMode": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "mean"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 35,
-          "title": "Processing Duration Percentiles",
-          "type": "timeseries",
-          "datasource": {
-            "type": "elasticsearch",
-            "uid": "elasticsearch-ds"
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 24,
-            "x": 0,
-            "y": 35
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "elasticsearch",
-                "uid": "elasticsearch-ds"
-              },
-              "query": "serviceName:\"webhook\"",
+              "query": "serviceName:\"$service_name\"",
               "metrics": [
                 {
                   "id": "1",
@@ -963,9 +340,9 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 20
       },
-      "id": 50,
+      "id": 20,
       "title": "Filtered Log Stream",
       "type": "logs",
       "datasource": {
@@ -978,7 +355,7 @@
             "type": "elasticsearch",
             "uid": "elasticsearch-ds"
           },
-          "query": "serviceName:(splitter OR hbase-writer OR webhook)",
+          "query": "serviceName:($service_name)",
           "metrics": [
             {
               "id": "1",
@@ -1027,7 +404,33 @@
   "title": "RabbitProcessor Overview",
   "uid": "rabbitprocessor-overview",
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "value": [
+            "$__all"
+          ],
+          "text": "All"
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "elasticsearch-ds"
+        },
+        "definition": "{\"find\": \"terms\", \"field\": \"serviceName.keyword\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "service_name",
+        "options": [],
+        "query": "{\"find\": \"terms\", \"field\": \"serviceName.keyword\"}",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "version": 1
 }
