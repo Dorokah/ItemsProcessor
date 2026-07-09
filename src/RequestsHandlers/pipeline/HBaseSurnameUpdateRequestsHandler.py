@@ -5,7 +5,7 @@ import happybase
 
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import traced_consumer, start_item_span, get_message_json_trace_id
 
 
 class HBaseSurnameUpdateRequestsHandler(RequestHandler):
@@ -18,32 +18,45 @@ class HBaseSurnameUpdateRequestsHandler(RequestHandler):
 
     @traced_consumer
     def handle_request(self, producer, consumer, message):
-        body = message.value()
+        self.handle_batch(producer, consumer, [message])
+
+    def handle_batch(self, producer, consumer, messages):
         start_timestamp = time.time()
         self.service_logger.reset_aggregated_log()
         self.service_logger.log_trace_id()
 
+        parsed_records = []
+        failed_records = []
+
+        for message in messages:
+            try:
+                enriched_event = json.loads(message.value())
+                pokemon_id = str(enriched_event.get("id", ""))
+                surname = str(enriched_event.get("surname", "")).strip()
+                french_name = str(enriched_event.get("frenchName", "")).strip()
+
+                if not pokemon_id:
+                    raise ValueError("Missing 'id' in enriched surname event")
+                if not surname:
+                    raise ValueError("Missing 'surname' in enriched surname event")
+                if not french_name:
+                    raise ValueError("Missing 'frenchName' in enriched surname event")
+
+                parsed_records.append((message, pokemon_id, surname, french_name))
+            except Exception as exc:
+                failed_records.append(str(exc))
+
+        pokemon_ids = [pokemon_id for _, pokemon_id, _, _ in parsed_records]
+        self.service_logger.add_field("requestId", f"hbase-surname-batch-{'_'.join(pokemon_ids[:5])}" if pokemon_ids else "hbase-surname-batch-empty")
+        self.service_logger.add_field("batchSize", len(messages))
+        self.service_logger.add_field("hbaseBatchSize", len(parsed_records))
+        self.service_logger.add_field("entityIds", pokemon_ids)
+        self.service_logger.info(
+            f"Updating HBase surname fields for {len(parsed_records)} records from {len(messages)} messages"
+        )
+
+        connection = None
         try:
-            enriched_event = json.loads(body)
-            pokemon_id = str(enriched_event.get("id", ""))
-            surname = str(enriched_event.get("surname", "")).strip()
-            french_name = str(enriched_event.get("frenchName", "")).strip()
-
-            if not pokemon_id:
-                raise ValueError("Missing 'id' in enriched surname event")
-            if not surname:
-                raise ValueError("Missing 'surname' in enriched surname event")
-            if not french_name:
-                raise ValueError("Missing 'frenchName' in enriched surname event")
-
-            self.service_logger.add_field("requestId", f"hbase-surname-update-{pokemon_id}")
-            self.service_logger.add_field("entityId", pokemon_id)
-            self.service_logger.add_field("surname", surname)
-            self.service_logger.add_field("frenchName", french_name)
-            self.service_logger.info(
-                f"Updating HBase surname fields for Pokemon ID {pokemon_id}"
-            )
-
             connection = happybase.Connection(
                 host=self.hbase_host,
                 port=self.hbase_port,
@@ -53,19 +66,40 @@ class HBaseSurnameUpdateRequestsHandler(RequestHandler):
             self._ensure_table(connection)
 
             table = connection.table(self.table_name)
-            table.put(
-                pokemon_id.encode("utf-8"),
-                {
-                    b"name:surname": surname.encode("utf-8"),
-                    b"name:frenchSurname": french_name.encode("utf-8"),
-                },
-            )
-            connection.close()
+            batch = table.batch(batch_size=max(len(parsed_records), 1))
+            for message, pokemon_id, surname, french_name in parsed_records:
+                with start_item_span(
+                    "queue_hbase_surname_put",
+                    pokemon_id,
+                    json_trace_id=get_message_json_trace_id(message),
+                    message=message,
+                ):
+                    batch.put(
+                        pokemon_id.encode("utf-8"),
+                        {
+                            b"name:surname": surname.encode("utf-8"),
+                            b"name:frenchSurname": french_name.encode("utf-8"),
+                        },
+                    )
+            batch.send()
 
-            self.service_logger.log_success_logstash(start_timestamp)
+            if failed_records:
+                self.service_logger.add_field("hbaseFailureCount", len(failed_records))
+                self.service_logger.add_field("hbaseBatchErrors", failed_records)
+                self.service_logger.log_error(
+                    f"HBase surname batch had {len(failed_records)} invalid records",
+                    start_timestamp,
+                )
+            else:
+                self.service_logger.add_field("hbaseSuccessCount", len(parsed_records))
+                self.service_logger.log_success_logstash(start_timestamp)
 
         except Exception as exc:
+            self.service_logger.add_field("hbaseFailureCount", len(parsed_records) + len(failed_records))
             self.service_logger.log_error(str(exc), start_timestamp)
+        finally:
+            if connection:
+                connection.close()
 
     def _ensure_table(self, connection):
         table_name_bytes = self.table_name.encode("utf-8")

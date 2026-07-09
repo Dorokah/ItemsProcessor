@@ -77,6 +77,14 @@ def get_max_worker_threads():
     return int(os.environ.get('MAX_WORKER_THREADS', '8'))
 
 
+def get_batch_size():
+    return int(os.environ.get('BATCH_SIZE', '1'))
+
+
+def get_batch_timeout_seconds():
+    return float(os.environ.get('BATCH_TIMEOUT_SECONDS', '1.0'))
+
+
 #  HBase configs:
 def get_hbase_host():
     return os.environ.get('HBASE_HOST', 'localhost')

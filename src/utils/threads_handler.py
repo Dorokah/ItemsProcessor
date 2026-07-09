@@ -2,6 +2,7 @@ import threading
 import time
 from src.utils.service_logger import ServiceLogger
 from src.utils import config_provider
+from src.utils.tracer import start_batch_span
 from importlib import import_module
 
 
@@ -24,7 +25,29 @@ class ThreadsHandler:
         if self.is_sigterm_received:
             service_logger.log_sigterm_received()
 
+    def _do_batch_work(self, messages):
+        service_logger = ServiceLogger()
+        request_handler_class = getattr(self.rh_module, self.rh_import_class)
+        requests_handler = request_handler_class(service_logger)
+
+        with start_batch_span("consume_kafka_batch", messages):
+            if hasattr(requests_handler, "handle_batch"):
+                requests_handler.handle_batch(self.producer, self.consumer, messages)
+            else:
+                for message in messages:
+                    requests_handler.handle_request(self.producer, self.consumer, message)
+
+        self.producer.flush()
+        if self.is_sigterm_received:
+            service_logger.log_sigterm_received()
+
     def on_message(self, message):
+        self.on_batch([message])
+
+    def on_batch(self, messages):
+        if not messages:
+            return
+
         self._remove_finished_threads()
         while len(self.threads) >= self.max_worker_threads and not self.is_sigterm_received:
             self.service_logger.info(
@@ -33,7 +56,7 @@ class ThreadsHandler:
             time.sleep(0.5)
             self._remove_finished_threads()
 
-        t = threading.Thread(target=self._do_work, args=(message,))
+        t = threading.Thread(target=self._do_batch_work, args=(messages,))
         t.start()
         self.threads.append(t)
 

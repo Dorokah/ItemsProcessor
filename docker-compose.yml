@@ -25,6 +25,23 @@ services:
     depends_on:
       - tempo
 
+  pokemon-trace-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pokemon-trace-dashboard
+    depends_on:
+      - tempo
+      - grafana
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - TEMPO_URL=http://tempo:3200
+      - GRAFANA_URL=http://localhost:3000
+      - TRACE_DASHBOARD_LOOKBACK_SECONDS=21600
+    entrypoint: ["python3", "-m", "src.pokemon_trace_dashboard"]
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.3
     container_name: elasticsearch
@@ -114,6 +131,8 @@ services:
       - CONSUME_TOPIC=pokedex-raw
       - PUBLISH_TOPIC=pokemon-individual
       - SERVICE_NAME=splitter
+      - BATCH_SIZE=3
+      - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
@@ -191,6 +210,8 @@ services:
       - PUBLISH_TOPIC=pokemon-ecriched
       - SURNAME_API_URL=http://surname-api-service:8066
       - SERVICE_NAME=surname-enrichment
+      - BATCH_SIZE=3
+      - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
@@ -219,6 +240,8 @@ services:
       - HBASE_PORT=9090
       - HBASE_TABLE_NAME=pokemon
       - SERVICE_NAME=hbase-writer
+      - BATCH_SIZE=2
+      - BATCH_TIMEOUT_SECONDS=1.0
       - MAX_WORKER_THREADS=4
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
@@ -248,6 +271,8 @@ services:
       - HBASE_TABLE_NAME=pokemon
       - HBASE_TIMEOUT_MS=5000
       - SERVICE_NAME=hbase-surname-updater
+      - BATCH_SIZE=2
+      - BATCH_TIMEOUT_SECONDS=1.0
       - MAX_WORKER_THREADS=2
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
@@ -274,6 +299,8 @@ services:
       - CONSUME_TOPIC=hbase-status
       - WEBHOOK_URL=http://webhook-mock/post
       - SERVICE_NAME=webhook
+      - BATCH_SIZE=3
+      - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044

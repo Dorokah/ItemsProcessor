@@ -7,7 +7,14 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from opentracing import Format
 
 from src.utils.service_logger import ServiceLogger
-from src.utils.tracer import init_tracer
+from src.utils.tracer import (
+    HTTP_ITEM_ID_HEADER,
+    ITEM_ID_HEADER,
+    JSON_TRACE_ID_HEADER,
+    init_tracer,
+    set_active_span_item_tags,
+    set_active_span_json_trace_tags,
+)
 
 
 SURNAME_FRENCH_NAMES = {
@@ -58,6 +65,34 @@ def get_parent_context(request):
         return None
 
 
+def get_context_item_id(context):
+    if not context:
+        return None
+
+    try:
+        return context.get_baggage_item(ITEM_ID_HEADER)
+    except Exception:
+        return None
+
+
+def get_request_item_id(request, context):
+    return request.headers.get(HTTP_ITEM_ID_HEADER) or get_context_item_id(context)
+
+
+def get_context_json_trace_id(context):
+    if not context:
+        return None
+
+    try:
+        return context.get_baggage_item(JSON_TRACE_ID_HEADER)
+    except Exception:
+        return None
+
+
+def get_request_json_trace_id(request, context):
+    return request.headers.get(JSON_TRACE_ID_HEADER) or get_context_json_trace_id(context)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -73,15 +108,18 @@ def translate(request: Request, surname: str = Query(..., min_length=1)):
     start_timestamp = time.time()
     logger = get_service_logger()
     parent_context = get_parent_context(request)
+    pokemon_id = get_request_item_id(request, parent_context)
+    json_trace_id = get_request_json_trace_id(request, parent_context)
 
     with opentracing.global_tracer().start_active_span(
         "surname_api_translate",
         child_of=parent_context,
     ) as scope:
         span = scope.span
-        span.set_tag("http.method", request.method)
-        span.set_tag("http.url", str(request.url))
-        span.set_tag("surname", surname)
+        if pokemon_id:
+            set_active_span_item_tags([pokemon_id])
+        if json_trace_id:
+            set_active_span_json_trace_tags([json_trace_id])
 
         logger.reset_aggregated_log()
         logger.log_trace_id()
@@ -89,6 +127,10 @@ def translate(request: Request, surname: str = Query(..., min_length=1)):
         logger.add_field("surname", surname)
         logger.add_field("httpMethod", request.method)
         logger.add_field("httpPath", request.url.path)
+        if pokemon_id:
+            logger.add_field("entityId", pokemon_id)
+        if json_trace_id:
+            logger.add_field("jsonTraceId", json_trace_id)
 
         try:
             french_name = translate_surname(surname)

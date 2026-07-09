@@ -10,7 +10,7 @@ import opentracing
 from confluent_kafka import Producer
 
 from src.utils.service_logger import ServiceLogger
-from src.utils.tracer import init_tracer, inject_trace_headers
+from src.utils.tracer import init_tracer, inject_trace_headers, set_active_span_item_tags
 
 
 SURNAMES = [
@@ -84,9 +84,7 @@ def main():
 
         with opentracing.global_tracer().start_active_span("generate_pokemon_surname") as scope:
             span = scope.span
-            span.set_tag("pokemon.id", pokemon_id)
-            span.set_tag("pokemon.surname", surname)
-            span.set_tag("kafka.topic", topic)
+            set_active_span_item_tags([pokemon_id])
 
             service_logger.reset_aggregated_log()
             service_logger.log_trace_id()
@@ -101,7 +99,7 @@ def main():
                     topic=topic,
                     key=pokemon_id.encode("utf-8"),
                     value=json.dumps(event).encode("utf-8"),
-                    headers=inject_trace_headers(),
+                    headers=inject_trace_headers(item_id=pokemon_id),
                 )
                 producer.poll(0)
                 service_logger.info(f"Generated surname for Pokemon ID {pokemon_id}: {surname}")

@@ -15,6 +15,7 @@ sys.modules['tornado.stack_context'] = _mod
 tornado.stack_context = _mod
 
 import signal
+import time
 from confluent_kafka import Consumer, Producer
 from src.utils import config_provider
 from src.utils.service_logger import ServiceLogger
@@ -33,6 +34,8 @@ if __name__ == '__main__':
     bootstrap_servers = config_provider.get_kafka_bootstrap_servers()
     group_id = config_provider.get_kafka_group_id()
     consume_topic = config_provider.get_consume_queue_name()
+    batch_size = config_provider.get_batch_size()
+    batch_timeout_seconds = config_provider.get_batch_timeout_seconds()
 
     main_thread_logger.info(f"Initializing Kafka Consumer for topic: {consume_topic}")
     consumer_conf = {
@@ -62,17 +65,31 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGTERM, threads_handler.signal_handler)
 
-    main_thread_logger.info("Starting message consumption loop")
+    main_thread_logger.info(
+        f"Starting message consumption loop (batch_size={batch_size}, timeout={batch_timeout_seconds}s)"
+    )
     try:
         while not threads_handler.is_sigterm_received:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None:
+            batch_deadline = time.time() + batch_timeout_seconds
+            messages = consumer.consume(num_messages=batch_size, timeout=batch_timeout_seconds)
+            messages = [msg for msg in messages if msg is not None]
+            if not messages:
                 continue
-            if msg.error():
+
+            while len(messages) < batch_size and time.time() < batch_deadline:
+                remaining = batch_size - len(messages)
+                remaining_timeout = max(batch_deadline - time.time(), 0.0)
+                more_messages = consumer.consume(num_messages=remaining, timeout=remaining_timeout)
+                messages.extend([msg for msg in more_messages if msg is not None])
+
+            errored_messages = [msg for msg in messages if msg.error()]
+            for msg in errored_messages:
                 main_thread_logger.logger.error(f"Kafka error: {msg.error()}")
+            valid_messages = [msg for msg in messages if not msg.error()]
+            if not valid_messages:
                 continue
-            
-            threads_handler.on_message(msg)
+
+            threads_handler.on_batch(valid_messages)
     finally:
         main_thread_logger.info("Closing Kafka consumer and flushing producer")
         consumer.close()
