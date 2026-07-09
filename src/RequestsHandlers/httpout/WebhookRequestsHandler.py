@@ -16,6 +16,8 @@ class WebhookRequestsHandler(RequestHandler):
         self._handle_message(message)
 
     def handle_batch(self, producer, consumer, messages):
+        start_timestamp = time.time()
+        batch_results = []
         if config_provider.get_tracing_enable():
             with trace_span(
                 "WebhookRequestsHandler.batch",
@@ -29,12 +31,14 @@ class WebhookRequestsHandler(RequestHandler):
                         "WebhookRequestsHandler.post_status",
                         extra_links=batch_links
                     ):
-                        self._handle_message(message)
+                        batch_results.append(self._handle_message(message, log_to_elastic=False))
+                self._log_batch_result(messages, batch_results, start_timestamp)
         else:
             for message in messages:
-                self._handle_message(message)
+                batch_results.append(self._handle_message(message, log_to_elastic=False))
+            self._log_batch_result(messages, batch_results, start_timestamp)
 
-    def _handle_message(self, message):
+    def _handle_message(self, message, log_to_elastic=True):
         body = message.value()
         start_timestamp = time.time()
         self.service_logger.reset_aggregated_log()
@@ -43,9 +47,10 @@ class WebhookRequestsHandler(RequestHandler):
             status_payload = json.loads(body)
             pokemon_id = status_payload.get('id', '')
             status = status_payload.get('status', '')
+            request_id = f"webhook-{pokemon_id}"
 
             # Setup logging metadata fields
-            self.service_logger.add_field('requestId', f"webhook-{pokemon_id}")
+            self.service_logger.add_field('requestId', request_id)
             self.service_logger.add_field('entityId', pokemon_id)
             self.service_logger.info(f"Received status update for Pokemon ID {pokemon_id}: {status}")
 
@@ -54,10 +59,56 @@ class WebhookRequestsHandler(RequestHandler):
             response = requests.post(self.webhook_url, json=status_payload, timeout=10)
 
             self.service_logger.info(f"Webhook response status: {response.status_code}")
-            self.service_logger.log_success_logstash(start_timestamp)
+            if log_to_elastic:
+                self.service_logger.log_success_logstash(start_timestamp)
+            return {
+                "requestId": request_id,
+                "entityId": pokemon_id,
+                "status": status,
+                "webhookStatusCode": response.status_code
+            }
 
         except Exception as e:
-            self.service_logger.log_error(f"Error forwarding webhook status: {e}", start_timestamp)
+            error_message = f"Error forwarding webhook status: {e}"
+            if log_to_elastic:
+                self.service_logger.log_error(error_message, start_timestamp)
+            return {
+                "requestId": self.service_logger.get_aggregated_log().get('requestId', 'webhook-unknown'),
+                "entityId": self.service_logger.get_aggregated_log().get('entityId', 'unknown'),
+                "error": error_message
+            }
+
+    def _log_batch_result(self, messages, batch_results, start_timestamp):
+        errors = [result for result in batch_results if result.get("error")]
+        successful_results = [result for result in batch_results if not result.get("error")]
+
+        self.service_logger.reset_aggregated_log()
+        self.service_logger.log_trace_id()
+        self.service_logger.add_field('requestId', self._build_batch_request_id(messages))
+        self.service_logger.add_field('entityId', 'webhook-batch')
+        self.service_logger.add_field('batchSize', len(messages))
+        self.service_logger.add_field('batchMessageOffsets', [self._message_position(message) for message in messages])
+        self.service_logger.add_field('webhookSuccessCount', len(successful_results))
+        self.service_logger.add_field('webhookFailureCount', len(errors))
+        self.service_logger.add_field('webhookEntityIds', [result.get('entityId') for result in batch_results])
+        self.service_logger.add_field(
+            'webhookStatusCodes',
+            [result.get('webhookStatusCode') for result in successful_results]
+        )
+
+        if errors:
+            self.service_logger.add_field('webhookBatchErrors', errors)
+            self.service_logger.log_error(f"Webhook batch completed with {len(errors)} failures", start_timestamp)
+        else:
+            self.service_logger.log_success_logstash(start_timestamp)
+
+    @classmethod
+    def _build_batch_request_id(cls, messages):
+        return "webhook-batch-" + "_".join(cls._message_position(message) for message in messages)
+
+    @staticmethod
+    def _message_position(message):
+        return f"{message.topic()}-{message.partition()}-{message.offset()}"
 
     # ------ Placeholders to match base class abstract methods ------ #
     def perform_actions(self, body, start_timestamp):

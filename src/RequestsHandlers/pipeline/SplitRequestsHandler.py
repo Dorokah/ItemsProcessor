@@ -22,6 +22,8 @@ class SplitRequestsHandler(RequestHandler):
         self._split_message(producer, message)
 
     def handle_batch(self, producer, consumer, messages):
+        start_timestamp = time.time()
+        batch_results = []
         if config_provider.get_tracing_enable():
             with trace_span(
                 "SplitRequestsHandler.batch",
@@ -30,22 +32,29 @@ class SplitRequestsHandler(RequestHandler):
             ):
                 batch_links = [link_current_span({"link.type": "batch"})]
                 for message in messages:
-                    self._split_message(producer, message, batch_links)
+                    batch_results.append(self._split_message(producer, message, batch_links, log_to_elastic=False))
+                self._log_batch_result(messages, batch_results, start_timestamp)
         else:
             for message in messages:
-                self._split_message(producer, message)
+                batch_results.append(self._split_message(producer, message, log_to_elastic=False))
+            self._log_batch_result(messages, batch_results, start_timestamp)
 
-    def _split_message(self, producer, message, batch_links=None):
+    def _split_message(self, producer, message, batch_links=None, log_to_elastic=True):
         body = message.value()
         start_timestamp = time.time()
+        request_id = self._build_request_id(message)
         self.service_logger.reset_aggregated_log()
         self.service_logger.log_trace_id()
-        self.service_logger.add_field('requestId', self._build_request_id(message))
+        self.service_logger.add_field('requestId', request_id)
         try:
             pokedex = json.loads(body)
             if not isinstance(pokedex, list):
                 self.service_logger.info("Incoming pokedex payload is not a JSON list!")
-                return
+                return {
+                    "requestId": request_id,
+                    "publishedCount": 0,
+                    "error": "Incoming pokedex payload is not a JSON list!"
+                }
 
             total_pokemon = len(pokedex)
             self.service_logger.add_field('entityId', 'pokedex')
@@ -71,11 +80,56 @@ class SplitRequestsHandler(RequestHandler):
                     producer.poll(0)
 
             producer.flush()
-            self.service_logger.log_success_logstash(start_timestamp)
+            if log_to_elastic:
+                self.service_logger.log_success_logstash(start_timestamp)
+            return {
+                "requestId": request_id,
+                "publishedCount": total_pokemon,
+                "pokemonIds": [str(pokemon.get('id', '')) for pokemon in pokedex]
+            }
 
         except Exception as e:
-            self.service_logger.log_error(str(e), start_timestamp)
+            if log_to_elastic:
+                self.service_logger.log_error(str(e), start_timestamp)
+            return {
+                "requestId": request_id,
+                "publishedCount": 0,
+                "error": str(e)
+            }
+
+    def _log_batch_result(self, messages, batch_results, start_timestamp):
+        errors = [result for result in batch_results if result.get("error")]
+        published_count = sum(result.get("publishedCount", 0) for result in batch_results)
+        pokemon_ids = [
+            pokemon_id
+            for result in batch_results
+            for pokemon_id in result.get("pokemonIds", [])
+            if pokemon_id
+        ]
+
+        self.service_logger.reset_aggregated_log()
+        self.service_logger.log_trace_id()
+        self.service_logger.add_field('requestId', self._build_batch_request_id(messages))
+        self.service_logger.add_field('entityId', 'pokedex-batch')
+        self.service_logger.add_field('batchSize', len(messages))
+        self.service_logger.add_field('batchMessageOffsets', [self._message_position(message) for message in messages])
+        self.service_logger.add_field('splitCount', published_count)
+        self.service_logger.add_field('splitPokemonIds', pokemon_ids)
+
+        if errors:
+            self.service_logger.add_field('batchErrors', errors)
+            self.service_logger.log_error(f"Splitter batch completed with {len(errors)} errors", start_timestamp)
+        else:
+            self.service_logger.log_success_logstash(start_timestamp)
 
     @staticmethod
     def _build_request_id(message):
         return f"splitter-{message.topic()}-{message.partition()}-{message.offset()}"
+
+    @classmethod
+    def _build_batch_request_id(cls, messages):
+        return "splitter-batch-" + "_".join(cls._message_position(message) for message in messages)
+
+    @staticmethod
+    def _message_position(message):
+        return f"{message.topic()}-{message.partition()}-{message.offset()}"

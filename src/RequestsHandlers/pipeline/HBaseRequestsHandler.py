@@ -298,14 +298,6 @@ class HBaseRequestsHandler(RequestHandler):
                     )
                     producer.poll(0)
 
-                self.service_logger.reset_aggregated_log()
-                self.service_logger.log_trace_id()
-                self.service_logger.add_field('requestId', f"hbase-{pokemon_id}")
-                self.service_logger.add_field('entityId', pokemon_id)
-                self.service_logger.add_field('hbaseBatchSize', len(successful_records))
-                self.service_logger.add_field('hbaseBatchEntityIds', batch_record_ids)
-                self.service_logger.log_success_logstash(start_hbase_time)
-
         # 4. Publish failed status for failed writes, wrapped in individual trace contexts
         for pokemon_id, err_msg, message in failed_records:
             with trace_message(message, "HBaseRequestsHandler.publish_status", extra_links=batch_links):
@@ -323,13 +315,42 @@ class HBaseRequestsHandler(RequestHandler):
                     )
                     producer.poll(0)
 
-                self.service_logger.reset_aggregated_log()
-                self.service_logger.log_trace_id()
-                self.service_logger.add_field('requestId', f"hbase-{pokemon_id}")
-                self.service_logger.add_field('entityId', pokemon_id)
-                self.service_logger.add_field('hbaseBatchSize', len(messages))
-                self.service_logger.log_error(err_msg, start_hbase_time)
-
         # Flush any remaining messages to Kafka before finishing the batch
         if self.publish_topic:
             producer.flush()
+
+        self.service_logger.reset_aggregated_log()
+        self.service_logger.log_trace_id()
+        self.service_logger.add_field('requestId', self._build_batch_request_id(messages))
+        self.service_logger.add_field('entityId', 'hbase-batch')
+        self.service_logger.add_field('batchSize', message_count)
+        self.service_logger.add_field('batchMessageOffsets', [self._message_position(message) for message in messages])
+        self.service_logger.add_field('hbaseBatchSize', len(valid_writes))
+        self.service_logger.add_field('hbaseBatchEntityIds', batch_record_ids)
+        self.service_logger.add_field('hbaseSuccessCount', len(successful_records))
+        self.service_logger.add_field('hbaseSuccessEntityIds', [pokemon_id for _, _, pokemon_id, _ in successful_records])
+        self.service_logger.add_field('hbaseFailureCount', len(failed_records))
+        self.service_logger.add_field(
+            'hbaseFailureEntityIds',
+            [pokemon_id for pokemon_id, _, _ in failed_records]
+        )
+
+        if failed_records:
+            self.service_logger.add_field(
+                'hbaseBatchErrors',
+                [{"entityId": pokemon_id, "error": err_msg} for pokemon_id, err_msg, _ in failed_records]
+            )
+            self.service_logger.log_error(
+                f"HBase batch completed with {len(failed_records)} failures",
+                start_hbase_time
+            )
+        else:
+            self.service_logger.log_success_logstash(start_hbase_time)
+
+    @classmethod
+    def _build_batch_request_id(cls, messages):
+        return "hbase-batch-" + "_".join(cls._message_position(message) for message in messages)
+
+    @staticmethod
+    def _message_position(message):
+        return f"{message.topic()}-{message.partition()}-{message.offset()}"
