@@ -121,6 +121,83 @@ services:
       - JAEGER_AGENT_HOST=tempo
       - JAEGER_AGENT_PORT=6831
 
+  pokemon-surname-generator-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pokemon-surname-generator-service
+    depends_on:
+      kafka:
+        condition: service_started
+      logstash:
+        condition: service_started
+      tempo:
+        condition: service_started
+    volumes:
+      - ./pokedex.json:/app/pokedex.json:ro
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - PUBLISH_TOPIC=pokemon-surnames
+      - POKEDEX_FILE_PATH=/app/pokedex.json
+      - SURNAME_GENERATION_INTERVAL_SECONDS=60
+      - SERVICE_NAME=pokemon-surname-generator
+      - LOGSTASH_ENABLE=True
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
+      - TRACING_ENABLE=True
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
+    entrypoint: ["python3", "-m", "src.pokemon_surname_generator"]
+
+  surname-api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: surname-api-service
+    depends_on:
+      logstash:
+        condition: service_started
+      tempo:
+        condition: service_started
+    ports:
+      - "8066:8066"
+    environment:
+      - PORT=8066
+      - SERVICE_NAME=surname-api
+      - LOGSTASH_ENABLE=True
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
+      - TRACING_ENABLE=True
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
+    entrypoint: ["python3", "-m", "src.surname_api"]
+
+  surname-enrichment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: surname-enrichment-service
+    depends_on:
+      kafka:
+        condition: service_started
+      surname-api-service:
+        condition: service_started
+      logstash:
+        condition: service_started
+    environment:
+      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.SurnameEnrichmentRequestsHandler
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CONSUME_TOPIC=pokemon-surnames
+      - PUBLISH_TOPIC=pokemon-ecriched
+      - SURNAME_API_URL=http://surname-api-service:8066
+      - SERVICE_NAME=surname-enrichment
+      - LOGSTASH_ENABLE=True
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
+      - TRACING_ENABLE=True
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
+
   hbase-writer-service:
     build:
       context: .
@@ -142,6 +219,36 @@ services:
       - HBASE_PORT=9090
       - HBASE_TABLE_NAME=pokemon
       - SERVICE_NAME=hbase-writer
+      - MAX_WORKER_THREADS=4
+      - LOGSTASH_ENABLE=True
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=5044
+      - TRACING_ENABLE=True
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
+
+  hbase-surname-updater-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hbase-surname-updater-service
+    depends_on:
+      kafka:
+        condition: service_started
+      hbase:
+        condition: service_started
+      logstash:
+        condition: service_started
+    environment:
+      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.HBaseSurnameUpdateRequestsHandler
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CONSUME_TOPIC=pokemon-ecriched
+      - HBASE_HOST=hbase
+      - HBASE_PORT=9090
+      - HBASE_TABLE_NAME=pokemon
+      - HBASE_TIMEOUT_MS=5000
+      - SERVICE_NAME=hbase-surname-updater
+      - MAX_WORKER_THREADS=2
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044

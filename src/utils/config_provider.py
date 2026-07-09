@@ -19,7 +19,14 @@ def get_next_service_name():
 
 
 def get_request_handler_class_name():
-    parts = os.environ.get('REQUEST_HANDLER', '').split('.')
+    request_handler = os.environ.get('REQUEST_HANDLER', '')
+    if not request_handler:
+        return {"moduleName": "", "className": ""}
+
+    parts = request_handler.split('.')
+    if len(parts) < 4:
+        return {"moduleName": request_handler, "className": parts[-1]}
+
     return {"moduleName": f"{parts[0]}.{parts[1]}.{parts[2]}.{parts[3]}",
             "className": parts[3]}
 
@@ -66,6 +73,10 @@ def get_kafka_group_id():
     return os.environ.get('KAFKA_GROUP_ID', 'processor-group')
 
 
+def get_max_worker_threads():
+    return int(os.environ.get('MAX_WORKER_THREADS', '8'))
+
+
 #  HBase configs:
 def get_hbase_host():
     return os.environ.get('HBASE_HOST', 'localhost')
@@ -79,9 +90,17 @@ def get_hbase_table_name():
     return os.environ.get('HBASE_TABLE_NAME', 'pokemon')
 
 
+def get_hbase_timeout_ms():
+    return int(os.environ.get('HBASE_TIMEOUT_MS', '5000'))
+
+
 #  Webhook configs:
 def get_webhook_url():
     return os.environ.get('WEBHOOK_URL', 'http://localhost:8080/webhook')
+
+
+def get_surname_api_url():
+    return os.environ.get('SURNAME_API_URL', 'http://localhost:8082')
 
 
 #  Kafka Topics (mapped to queue names for compatibility):

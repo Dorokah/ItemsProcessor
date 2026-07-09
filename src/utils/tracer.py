@@ -1,4 +1,27 @@
 import functools
+import sys
+from types import ModuleType
+
+import tornado
+
+if 'tornado.stack_context' not in sys.modules:
+    _mod = ModuleType('tornado.stack_context')
+
+    class _DummyStackContext:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    _mod.StackContext = _DummyStackContext
+    _mod.ExceptionStackContext = _DummyStackContext
+    _mod.wrap = lambda f: f
+    sys.modules['tornado.stack_context'] = _mod
+    tornado.stack_context = _mod
 
 import opentracing
 from jaeger_client import Config

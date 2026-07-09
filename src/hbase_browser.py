@@ -83,7 +83,7 @@ HTML_TEMPLATE = """
         <!-- Search & Filters -->
         <div class="glass-card rounded-2xl p-6 mb-16 flex flex-col md:flex-row gap-4">
             <div class="flex-1 relative">
-                <input type="text" id="search" placeholder="Search by name, ID, or description..." 
+                <input type="text" id="search" placeholder="Search by name, surname, ID, or description..." 
                        class="w-full bg-slate-950/80 border border-slate-800/80 rounded-xl px-4 py-3.5 pl-11 focus:outline-none focus:border-indigo-500 text-slate-200 placeholder-slate-500 transition-colors"
                        onkeyup="filterPokemon()">
                 <svg class="w-5 h-5 absolute left-4 top-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +106,7 @@ HTML_TEMPLATE = """
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-16 gap-x-6" id="pokemon-grid">
             {% for p in pokemon_list %}
             <div class="pokemon-card glass-card rounded-2xl p-6 pt-16 flex flex-col justify-between relative mt-6" 
-                 data-name="{{ p.name_english.lower() }} {{ p.id }} {{ p.description.lower() }}"
+                 data-name="{{ p.name_english.lower() }} {{ p.surname.lower() }} {{ p.french_surname.lower() }} {{ p.id }} {{ p.description.lower() }}"
                  data-types="{{ p.types | join(',') }}">
                 
                 <!-- Floating Avatar -->
@@ -161,6 +161,18 @@ HTML_TEMPLATE = """
                             <span>•</span>
                             <span>{{ p.species }}</span>
                         </div>
+                        {% if p.surname or p.french_surname %}
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div class="rounded-lg bg-slate-950/70 border border-slate-800 px-3 py-2">
+                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Surname</div>
+                                <div class="text-sm font-semibold text-indigo-200">{{ p.surname or "Pending" }}</div>
+                            </div>
+                            <div class="rounded-lg bg-slate-950/70 border border-slate-800 px-3 py-2">
+                                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">French</div>
+                                <div class="text-sm font-semibold text-pink-200">{{ p.french_surname or "Pending" }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- Description -->
@@ -260,6 +272,8 @@ def fetch_pokemon_from_hbase():
                 'id': pokemon_id,
                 'name_english': data.get(b'name:english', b'').decode('utf-8') or f"Pokémon {pokemon_id}",
                 'name_japanese': data.get(b'name:japanese', b'').decode('utf-8'),
+                'surname': data.get(b'name:surname', b'').decode('utf-8'),
+                'french_surname': data.get(b'name:frenchSurname', b'').decode('utf-8'),
                 'species': data.get(b'info:species', b'').decode('utf-8'),
                 'description': data.get(b'info:description', b'').decode('utf-8'),
                 'hp': int(data.get(b'base:HP', b'0').decode('utf-8')),

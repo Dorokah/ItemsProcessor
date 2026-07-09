@@ -10,6 +10,9 @@ if ! docker compose ps | grep -q "Up"; then
   exit 1
 fi
 
+echo "Resetting pipeline state..."
+bash "$REPO_ROOT/scripts/reset_pipeline_state.sh"
+
 echo "Copying pokedex.json to the splitter-service container..."
 docker cp "$REPO_ROOT/pokedex.json" splitter-service:/app/pokedex.json
 

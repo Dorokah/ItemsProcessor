@@ -1,5 +1,7 @@
 import threading
+import time
 from src.utils.service_logger import ServiceLogger
+from src.utils import config_provider
 from importlib import import_module
 
 
@@ -12,6 +14,7 @@ class ThreadsHandler:
         self.is_sigterm_received = False
         self.rh_module = import_module(request_handler_import_pkg)
         self.rh_import_class = request_handler_import_class
+        self.max_worker_threads = config_provider.get_max_worker_threads()
 
     def _do_work(self, message):
         service_logger = ServiceLogger()
@@ -23,6 +26,13 @@ class ThreadsHandler:
 
     def on_message(self, message):
         self._remove_finished_threads()
+        while len(self.threads) >= self.max_worker_threads and not self.is_sigterm_received:
+            self.service_logger.info(
+                f"Max worker threads reached ({self.max_worker_threads}); waiting before consuming more work"
+            )
+            time.sleep(0.5)
+            self._remove_finished_threads()
+
         t = threading.Thread(target=self._do_work, args=(message,))
         t.start()
         self.threads.append(t)
