@@ -11,3 +11,7 @@ ply
 fastapi
 uvicorn
 jinja2
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-instrumentation-requests

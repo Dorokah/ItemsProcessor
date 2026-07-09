@@ -46,7 +46,7 @@ graph TD
 1. **High Concurrency & Multi-Threading**: Out-of-the-box asynchronous OS thread pool handling incoming messages, maximizing I/O performance (e.g. database writes, HTTP calls) without blocking the consumption loop.
 2. **Flexible Request Handler Abstraction**: A base `RequestHandler` template managing transaction setup, logging, distributed tracing propagation, error capture, and output queue publication.
 3. **Structured Telemetry (ELK integration)**: Structured JSON-based logging to Logstash which directly populates Elasticsearch, avoiding raw text logs and allowing rich dashboard filters.
-4. **Distributed Tracing (OpenTracing/Tempo)**: Automatic injection and propagation of OpenTracing-compliant headers across Kafka topics. The entire multi-service flow is linked under a single distributed trace.
+4. **Distributed Tracing (OpenTelemetry/Tempo)**: Automatic injection and propagation of W3C trace-context headers across Kafka topics. Batch fan-in and per-message fan-out are connected with OpenTelemetry span links.
 5. **Modern Explore UI Support**: Modern Grafana URL integration supporting direct trace-to-logs navigation in a new tab.
 
 ---
@@ -151,8 +151,7 @@ Configure your service in [docker-compose.yml](file:///Users/dorokah/Documents/c
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
 ```
 
 ---
@@ -165,10 +164,11 @@ This repository includes a full observability suite powered by the **LGTM** (Lok
 * Every request execution emits structured metadata logs containing `serviceName`, `pipelineName`, `requestId`, `entityId`, `traceId`, `processingDuration`, and `statusType` (`processingSuccess` / `processingError`).
 * Logstash maps and index-partitions these logs in Elasticsearch (`rabbitprocessor-YYYY.MM.DD`).
 
-### 2. Distributed Tracing (Tempo + OpenTracing)
-* The entrypoint initializes a Jaeger-compatible distributed tracer.
-* When a message enters the pipeline, a root span is created. Spans and trace headers are injected into Kafka headers and propagated downstream.
-* Tempo collects UDP compact Thrift traces at port `6831`.
+### 2. Distributed Tracing (Tempo + OpenTelemetry)
+* The entrypoint initializes an OpenTelemetry tracer with OTLP/gRPC export to Tempo.
+* W3C trace-context headers are injected into Kafka headers and propagated downstream.
+* Batch spans link to all consumed message contexts, and per-message processing spans link back to their batch span so fan-in/fan-out remains visible in Tempo.
+* Tempo collects OTLP/gRPC traces at port `4317`.
 
 ### 3. Grafana Dashboard (Logs-to-Trace Navigation)
 * Grafana serves the `rabbitprocessor-overview` dashboard at `http://localhost:3000`.
@@ -211,6 +211,7 @@ The application is configured using environment variables defined in [src/utils/
 | `LOGSTASH_HOST` | Hostname for the Logstash server | `""` |
 | `LOGSTASH_PORT` | Port for the Logstash server | `0` |
 | `TRACING_ENABLE` | Enable distributed tracing via Tempo | `False` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/gRPC collector endpoint | `http://localhost:4317` |
 | `SERVICE_TIMEOUT` | Timeout in seconds for downstream HTTP posts | `30` |
 
 ---
@@ -229,8 +230,6 @@ The application is configured using environment variables defined in [src/utils/
    ```
 2. Install project dependencies:
    ```bash
-   uv pip install tornado==6.5.7 jaeger-client==4.8.0
-   uv pip install --no-deps opentracing-instrumentation==3.3.1
    uv pip install -r deps/requirements.txt
    ```
 3. Set environment variables and run locally:
@@ -277,3 +276,5 @@ To trigger and verify a complete test run of the Pokemon pipeline (Pokedex split
 4. The producer publishes the Pokedex structure to the Kafka pipeline, triggering the Splitter, HBase writer, and Webhook status forwarders automatically.
 
 Open **Grafana** at `http://localhost:3000` to watch the processed logs and trace charts update in real-time.
+
+Open **Kafka UI** at `http://localhost:8082` to inspect brokers, topics, partitions, consumer groups, and messages.

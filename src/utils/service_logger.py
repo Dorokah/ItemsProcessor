@@ -1,6 +1,7 @@
 import logging
 import time
-from opentracing import global_tracer
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from src.utils import config_provider, logstash_logger
 
 
@@ -16,7 +17,6 @@ class ServiceLogger:
                                                               self.service_config.get('logstashHost', ''),
                                                               self.service_config.get('logstashPort', 0),
                                                               self.service_config.get('elasticIndex', ''))
-        self.tracer = global_tracer()
 
     @staticmethod
     def _get_service_config():
@@ -60,9 +60,9 @@ class ServiceLogger:
         self.logstash_logger.log(message, self.aggregated_log)
 
     def log_trace_id(self):
-        span = self.tracer.active_span
-        if hasattr(span, 'trace_id'):
-            trace_id = format(span.trace_id, 'x')
+        span_context = trace.get_current_span().get_span_context()
+        if span_context.is_valid:
+            trace_id = format(span_context.trace_id, '032x')
             self.aggregated_log['traceId'] = trace_id
             return trace_id
         return "No_trace_ID"
@@ -82,7 +82,7 @@ class ServiceLogger:
         self.aggregated_log['statusType'] = 'processingSuccess'
         self.aggregated_log['processingDuration'] = time.time() - request_start_timestamp
         if self.service_config.get('tracingEnable', False) and self.service_config.get('tracingResultsLogsEnable', False):
-            self.tracer.active_span.log_kv({**self.aggregated_log, 'message': success_msg})
+            trace.get_current_span().add_event(success_msg, {**self.aggregated_log, 'message': success_msg})
         self.logstash_logger.log(success_msg, self.aggregated_log)
 
     def log_error(self, exception_message, request_start_timestamp, traceback=None):
@@ -95,7 +95,9 @@ class ServiceLogger:
             self.aggregated_log['errorTraceback'] = traceback
         self.aggregated_log['processingDuration'] = time.time() - float(request_start_timestamp)
         if self.service_config.get('tracingEnable', False):
-            self.tracer.active_span.log_kv({**self.aggregated_log, 'message': exception_message})
+            span = trace.get_current_span()
+            span.set_status(Status(StatusCode.ERROR, exception_message))
+            span.add_event("processingError", {**self.aggregated_log, 'message': exception_message})
         self.logstash_logger.log(exception_message, self.aggregated_log, False)
 
     def get_aggregated_log(self):

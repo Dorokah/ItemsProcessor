@@ -14,7 +14,7 @@ def main():
         print(f"Error: file not found at {pokedex_path}")
         sys.exit(1)
 
-    with open(pokedex_path, 'r', encoding='utf-8') as f:
+    with open(pokedex_path, 'r', encoding='utf-8-sig') as f:
         pokedex_content = f.read()
 
     # Validate that it is valid JSON

@@ -1,10 +1,16 @@
 import happybase
 import json
 import time
-import opentracing
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer, inject_trace_headers, trace_message
+from src.utils.tracer import (
+    extract_span_links,
+    inject_trace_headers,
+    link_current_span,
+    trace_message,
+    trace_span,
+    traced_consumer,
+)
 
 
 class HBaseRequestsHandler(RequestHandler):
@@ -139,14 +145,27 @@ class HBaseRequestsHandler(RequestHandler):
             self.service_logger.log_error(str(e), start_timestamp)
 
     def handle_batch(self, producer, consumer, messages):
-        self.service_logger.info(f"Starting HBase batch process for {len(messages)} messages")
+        if config_provider.get_tracing_enable():
+            with trace_span(
+                "HBaseRequestsHandler.batch",
+                links=extract_span_links(messages),
+                attributes={"messaging.batch.message_count": len(messages)}
+            ):
+                batch_links = [link_current_span({"link.type": "batch"})]
+                self._handle_batch(producer, consumer, messages, batch_links)
+        else:
+            self._handle_batch(producer, consumer, messages)
+
+    def _handle_batch(self, producer, consumer, messages, batch_links=None):
+        message_count = len(messages)
+        self.service_logger.info(f"Starting HBase batch process for {message_count} messages")
         
         valid_writes = []     # List of tuples: (row_key, data, pokemon_id, message)
         failed_records = []   # List of tuples: (pokemon_id, error_msg, message)
         
         # 1. Parse and validate each message in its own trace context
         for message in messages:
-            with trace_message(message, "HBaseRequestsHandler.prepare"):
+            with trace_message(message, "HBaseRequestsHandler.prepare", extra_links=batch_links):
                 body = message.value()
                 try:
                     pokemon = json.loads(body)
@@ -203,75 +222,68 @@ class HBaseRequestsHandler(RequestHandler):
         # 2. Write valid records to HBase in a single transaction/batch
         successful_records = []
         start_hbase_time = time.time()
+        batch_record_ids = []
         
         if valid_writes:
-            # Build references to trace the batch write from all messages in the batch
-            references = []
+            batch_record_ids = [pokemon_id for _, _, pokemon_id, _ in valid_writes]
+            links = []
             if config_provider.get_tracing_enable():
-                tracer = opentracing.global_tracer()
-                for _, _, _, message in valid_writes:
-                    headers = message.headers()
-                    if headers:
-                        headers_dict = {
-                            k: (v.decode('utf-8') if isinstance(v, bytes) else str(v))
-                            for k, v in headers
-                        }
-                        context = tracer.extract(opentracing.Format.TEXT_MAP, headers_dict)
-                        if context:
-                            references.append(opentracing.follows_from(context))
+                links = extract_span_links([message for _, _, _, message in valid_writes])
+                if batch_links:
+                    links.extend(batch_links)
 
             # Span context for batch write
-            batch_write_span = None
-            if config_provider.get_tracing_enable():
-                tracer = opentracing.global_tracer()
-                batch_write_span = tracer.start_active_span("HBaseRequestsHandler.batch_write", references=references)
+            with trace_span(
+                "HBaseRequestsHandler.batch_write",
+                links=links,
+                attributes={"db.system": "hbase", "db.name": self.table_name}
+            ):
+                try:
+                    self.service_logger.info(f"Connecting to HBase for batch write of {len(valid_writes)} records")
+                    connection = happybase.Connection(host=self.hbase_host, port=self.hbase_port)
+                    connection.open()
 
-            try:
-                self.service_logger.info(f"Connecting to HBase for batch write of {len(valid_writes)} records")
-                connection = happybase.Connection(host=self.hbase_host, port=self.hbase_port)
-                connection.open()
+                    # Ensure table and schema exist
+                    tables = connection.tables()
+                    families = {
+                        'info': dict(),
+                        'name': dict(),
+                        'type': dict(),
+                        'base': dict(),
+                        'profile': dict(),
+                        'evolution': dict()
+                    }
+                    table_name_bytes = self.table_name.encode('utf-8')
+                    if table_name_bytes not in tables:
+                        self.service_logger.info(f"Creating HBase table: {self.table_name}")
+                        try:
+                            connection.create_table(self.table_name, families)
+                        except Exception as e:
+                            if 'TableExistsException' in str(e):
+                                self.service_logger.info(f"HBase table {self.table_name} already exists (created concurrently).")
+                            else:
+                                raise e
 
-                # Ensure table and schema exist
-                tables = connection.tables()
-                families = {
-                    'info': dict(),
-                    'name': dict(),
-                    'type': dict(),
-                    'base': dict(),
-                    'profile': dict(),
-                    'evolution': dict()
-                }
-                table_name_bytes = self.table_name.encode('utf-8')
-                if table_name_bytes not in tables:
-                    self.service_logger.info(f"Creating HBase table: {self.table_name}")
-                    try:
-                        connection.create_table(self.table_name, families)
-                    except Exception as e:
-                        if 'TableExistsException' in str(e):
-                            self.service_logger.info(f"HBase table {self.table_name} already exists (created concurrently).")
-                        else:
-                            raise e
+                    table = connection.table(self.table_name)
 
-                table = connection.table(self.table_name)
-                
-                with table.batch() as b:
+                    with table.batch() as b:
+                        for row_key, data, pokemon_id, message in valid_writes:
+                            b.put(row_key, data)
+
+                    connection.close()
+                    successful_records = valid_writes
+                    self.service_logger.info(
+                        f"Finished HBase batch write of {len(successful_records)} records: {', '.join(batch_record_ids)}"
+                    )
+                except Exception as e:
+                    self.service_logger.logger.error(f"HBase batch write failed: {e}")
+                    # All these writes are now failed
                     for row_key, data, pokemon_id, message in valid_writes:
-                        b.put(row_key, data)
-                
-                connection.close()
-                successful_records = valid_writes
-            except Exception as e:
-                self.service_logger.logger.error(f"HBase batch write failed: {e}")
-                # All these writes are now failed
-                for row_key, data, pokemon_id, message in valid_writes:
-                    failed_records.append((pokemon_id, f"HBase batch write failure: {e}", message))
-            finally:
-                if batch_write_span:
-                    batch_write_span.close()
+                        failed_records.append((pokemon_id, f"HBase batch write failure: {e}", message))
 
         # 3. Publish success status for successful writes, wrapped in individual trace contexts
         for row_key, data, pokemon_id, message in successful_records:
-            with trace_message(message, "HBaseRequestsHandler.publish_status"):
+            with trace_message(message, "HBaseRequestsHandler.publish_status", extra_links=batch_links):
                 status_payload = {
                     "id": pokemon_id,
                     "status": "success",
@@ -290,11 +302,13 @@ class HBaseRequestsHandler(RequestHandler):
                 self.service_logger.log_trace_id()
                 self.service_logger.add_field('requestId', f"hbase-{pokemon_id}")
                 self.service_logger.add_field('entityId', pokemon_id)
+                self.service_logger.add_field('hbaseBatchSize', len(successful_records))
+                self.service_logger.add_field('hbaseBatchEntityIds', batch_record_ids)
                 self.service_logger.log_success_logstash(start_hbase_time)
 
         # 4. Publish failed status for failed writes, wrapped in individual trace contexts
         for pokemon_id, err_msg, message in failed_records:
-            with trace_message(message, "HBaseRequestsHandler.publish_status"):
+            with trace_message(message, "HBaseRequestsHandler.publish_status", extra_links=batch_links):
                 status_payload = {
                     "id": pokemon_id,
                     "status": "failed",
@@ -313,6 +327,7 @@ class HBaseRequestsHandler(RequestHandler):
                 self.service_logger.log_trace_id()
                 self.service_logger.add_field('requestId', f"hbase-{pokemon_id}")
                 self.service_logger.add_field('entityId', pokemon_id)
+                self.service_logger.add_field('hbaseBatchSize', len(messages))
                 self.service_logger.log_error(err_msg, start_hbase_time)
 
         # Flush any remaining messages to Kafka before finishing the batch

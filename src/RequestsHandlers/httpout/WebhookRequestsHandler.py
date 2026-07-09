@@ -3,7 +3,7 @@ import requests
 import time
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import extract_span_links, link_current_span, trace_message, trace_span, traced_consumer
 
 
 class WebhookRequestsHandler(RequestHandler):
@@ -13,6 +13,28 @@ class WebhookRequestsHandler(RequestHandler):
 
     @traced_consumer
     def handle_request(self, producer, consumer, message):
+        self._handle_message(message)
+
+    def handle_batch(self, producer, consumer, messages):
+        if config_provider.get_tracing_enable():
+            with trace_span(
+                "WebhookRequestsHandler.batch",
+                links=extract_span_links(messages),
+                attributes={"messaging.batch.message_count": len(messages)}
+            ):
+                batch_links = [link_current_span({"link.type": "batch"})]
+                for message in messages:
+                    with trace_message(
+                        message,
+                        "WebhookRequestsHandler.post_status",
+                        extra_links=batch_links
+                    ):
+                        self._handle_message(message)
+        else:
+            for message in messages:
+                self._handle_message(message)
+
+    def _handle_message(self, message):
         body = message.value()
         start_timestamp = time.time()
         self.service_logger.reset_aggregated_log()
@@ -35,7 +57,7 @@ class WebhookRequestsHandler(RequestHandler):
             self.service_logger.log_success_logstash(start_timestamp)
 
         except Exception as e:
-            self.service_logger.logger.error(f"Error forwarding webhook status: {e}")
+            self.service_logger.log_error(f"Error forwarding webhook status: {e}", start_timestamp)
 
     # ------ Placeholders to match base class abstract methods ------ #
     def perform_actions(self, body, start_timestamp):

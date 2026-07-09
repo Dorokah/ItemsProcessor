@@ -1,14 +1,10 @@
 import abc
-import functools
 import time
 import traceback
 from http import HTTPStatus
-import requests
-from opentracing import tags, Format, global_tracer
-from opentracing_instrumentation import traced_function
 from src.utils import config_provider, result_builder
 from src.utils.exceptions import RestException
-from src.utils.tracer import traced_consumer, get_trace_id, get_span_id
+from src.utils.tracer import inject_trace_headers, trace_span, traced_consumer
 from src.utils.service_logger import ServiceLogger
 
 
@@ -16,8 +12,6 @@ class RequestHandler(abc.ABC):
     def __init__(self, service_logger: ServiceLogger):
         self.service_logger = service_logger
         self.is_results_logging_enabled = config_provider.get_enable_results_logging()
-        self.is_first_service = config_provider.get_is_first_service()
-        self.tracer = global_tracer()
 
     @traced_consumer
     def handle_request(self, producer, consumer, message):
@@ -46,28 +40,22 @@ class RequestHandler(abc.ABC):
         self.service_logger.log_success_logstash(request_start_timestamp)
         return result_builder.create_success_result(result, self.service_logger.get_aggregated_log())
 
-    @traced_function
     def perform_service_call(self, request):
-        post_start_timestamp = time.time()
-        response = {}
-        post_duration = time.time() - post_start_timestamp
-        self.service_logger.log_post_duration(post_duration)
-        result = self.process_result(response)
-        if self.is_results_logging_enabled:
-            self.service_logger.log_results(result['results'])
-        return result
+        with trace_span("RequestHandler.perform_service_call"):
+            post_start_timestamp = time.time()
+            response = {}
+            post_duration = time.time() - post_start_timestamp
+            self.service_logger.log_post_duration(post_duration)
+            result = self.process_result(response)
+            if self.is_results_logging_enabled:
+                self.service_logger.log_results(result['results'])
+            return result
 
     def publish_and_ack(self, producer, topic_name, consumer, message, result_body):
-        headers = message.headers() or []
-        if self.is_first_service:
-            headers_dict = {k: v.decode('utf-8') if isinstance(v, bytes) else v for k, v in headers}
-            self.tracer.inject(self.tracer.active_span.context, Format.TEXT_MAP, headers_dict)
-            headers = [(k, str(v).encode('utf-8')) for k, v in headers_dict.items()]
-
         val_bytes = result_body.encode('utf-8') if isinstance(result_body, str) else result_body
         key_bytes = message.key()
 
-        producer.produce(topic=topic_name, value=val_bytes, key=key_bytes, headers=headers)
+        producer.produce(topic=topic_name, value=val_bytes, key=key_bytes, headers=inject_trace_headers(message.headers()))
         producer.poll(0)
 
     # ----- Optional Implementations -----#

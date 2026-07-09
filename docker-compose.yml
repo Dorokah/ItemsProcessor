@@ -7,7 +7,7 @@ services:
       - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
     ports:
       - "3200:3200"   # HTTP API
-      - "6831:6831/udp" # Jaeger thrift compact UDP
+      - "4317:4317"   # OTLP gRPC
 
   grafana:
     image: grafana/grafana:10.4.1
@@ -85,6 +85,19 @@ services:
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
       - KAFKA_MESSAGE_MAX_BYTES=10000000
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8082:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - DYNAMIC_CONFIG_ENABLED=true
+    depends_on:
+      kafka:
+        condition: service_started
+
   hbase:
     image: harisekhon/hbase:1.4
     container_name: hbase
@@ -114,12 +127,13 @@ services:
       - CONSUME_TOPIC=pokedex-raw
       - PUBLISH_TOPIC=pokemon-individual
       - SERVICE_NAME=splitter
+      - BATCH_SIZE=3
+      - BATCH_TIMEOUT_MS=500
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
 
   hbase-writer-service:
     build:
@@ -142,14 +156,13 @@ services:
       - HBASE_PORT=9090
       - HBASE_TABLE_NAME=pokemon
       - SERVICE_NAME=hbase-writer
-      - BATCH_SIZE=100
+      - BATCH_SIZE=2
       - BATCH_TIMEOUT_MS=500
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
 
   webhook-service:
     build:
@@ -169,12 +182,13 @@ services:
       - CONSUME_TOPIC=hbase-status
       - WEBHOOK_URL=http://webhook-mock/post
       - SERVICE_NAME=webhook
+      - BATCH_SIZE=100
+      - BATCH_TIMEOUT_MS=500
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4317
 
   hbase-browser:
     build:

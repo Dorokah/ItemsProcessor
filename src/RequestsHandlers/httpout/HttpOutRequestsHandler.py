@@ -2,10 +2,8 @@ import json
 import time
 import traceback
 import requests
-from opentracing_instrumentation import traced_function
 from src.RequestsHandlers.RequestHandler import RequestHandler
-from src.utils import result_builder
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import trace_span, traced_consumer
 from src.utils.service_logger import ServiceLogger
 
 
@@ -53,15 +51,15 @@ class HttpOutRequestsHandler(RequestHandler):
                 return {}
         raise Exception("Got unknown result")
 
-    @traced_function
     def send_result(self, result_url, result):
-        result_post_start_timestamp = time.time()
-        response = requests.post(result_url, json=result, timeout=self.service_timeout)
-        result_post_duration = time.time() - result_post_start_timestamp
-        status_code = str(response.status_code)
-        self.service_logger.info(f"Status Code: {status_code}")
-        self.service_logger.add_field('receivedStatusCode', status_code)
-        self.service_logger.add_field('resultPostDuration', result_post_duration)
+        with trace_span("HttpOutRequestsHandler.send_result"):
+            result_post_start_timestamp = time.time()
+            response = requests.post(result_url, json=result, timeout=self.service_timeout)
+            result_post_duration = time.time() - result_post_start_timestamp
+            status_code = str(response.status_code)
+            self.service_logger.info(f"Status Code: {status_code}")
+            self.service_logger.add_field('receivedStatusCode', status_code)
+            self.service_logger.add_field('resultPostDuration', result_post_duration)
 
     # ------ Placeholders to match base class abstract methods ------ #
     def perform_actions(self, body, start_timestamp):
