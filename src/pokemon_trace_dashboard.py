@@ -103,7 +103,7 @@ def _trace_link(trace_id):
     return (
         f"{GRAFANA_URL}/explore?schemaVersion=1&panes="
         f'{{"pokemon":{{"datasource":"tempo-ds","queries":[{{"refId":"A","query":"{trace_id}",'
-        f'"queryType":"traceql","datasource":{{"type":"tempo","uid":"tempo-ds"}}}}],'
+        f'"queryType":"traceId","datasource":{{"type":"tempo","uid":"tempo-ds"}}}}],'
         f'"range":{{"from":"now-6h","to":"now"}}}}}}&orgId=1'
     )
 

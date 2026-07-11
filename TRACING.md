@@ -144,6 +144,32 @@ This means:
 
 The batch is not used as the parent of item spans. The Kafka message context remains the parent, so the item stays in its own Pokemon trace.
 
+## Known Bug: Batch Span Visibility
+
+A batch span can have only one trace id. When a batch contains messages from multiple Pokemon traces, the batch span appears inside one of those Pokemon traces and links to the other message traces.
+
+Example: if HBase writes a batch with Pokemon `1` and `2`, Tempo may show:
+
+```text
+trace 9e9ec714b247cdda   pokemon.id=1
+  split_pokemon_item
+  consume_kafka_batch    pokemon.ids.sample=1,2
+  queue_hbase_pokemon_put
+  publish_hbase_status
+
+trace 12f0601e4e4b5d3e   pokemon.id=2
+  split_pokemon_item
+  queue_hbase_pokemon_put
+  publish_hbase_status
+```
+
+This is confusing because Pokemon `2` was part of the same HBase batch, but the visible `consume_kafka_batch` span may be shown only in Pokemon `1`'s trace. Pokemon `2`'s item spans still include `batch.trace_id` and `batch.span_id`, so the relationship is present, but Tempo does not render this like a shared batch node across both traces.
+
+This is a tracing model bug/limitation to fix later. The desired behavior is that a single Pokemon search clearly shows both:
+
+- the Pokemon item flow
+- the Kafka/HBase batch span that handled it, without making the batch span look like it belongs only to one Pokemon
+
 ## HBase Writer Behavior
 
 The HBase writer reads Kafka messages in batches, but creates logical item spans for each Pokemon:

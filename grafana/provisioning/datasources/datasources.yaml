@@ -33,5 +33,5 @@ datasources:
       logLevelField: "level"
       dataLinks:
         - field: "traceId"
-          url: 'http://localhost:3000/explore?schemaVersion=1&panes={"tp":{"datasource":"tempo-ds","queries":[{"refId":"A","queryType":"traceql","query":"$${__value.raw}","datasource":{"type":"tempo","uid":"tempo-ds"},"limit":20,"tableType":"traces"}],"range":{"from":"now-6h","to":"now"}}}&orgId=1'
+          url: 'http://localhost:3000/explore?schemaVersion=1&panes={"tp":{"datasource":"tempo-ds","queries":[{"refId":"A","queryType":"traceId","query":"$${__value.raw}","datasource":{"type":"tempo","uid":"tempo-ds"},"limit":20,"tableType":"traces"}],"range":{"from":"now-6h","to":"now"}}}&orgId=1'
           targetBlank: true
