@@ -4,11 +4,9 @@ import time
 import traceback
 from http import HTTPStatus
 import requests
-from opentracing import tags, Format, global_tracer
-from opentracing_instrumentation import traced_function
 from src.utils import config_provider, result_builder
 from src.utils.exceptions import RestException
-from src.utils.tracer import traced_consumer, get_trace_id, get_span_id
+from src.utils.tracer import traced_consumer, traced_function, inject_trace_headers
 from src.utils.service_logger import ServiceLogger
 
 
@@ -17,7 +15,6 @@ class RequestHandler(abc.ABC):
         self.service_logger = service_logger
         self.is_results_logging_enabled = config_provider.get_enable_results_logging()
         self.is_first_service = config_provider.get_is_first_service()
-        self.tracer = global_tracer()
 
     @traced_consumer
     def handle_request(self, producer, consumer, message):
@@ -60,9 +57,7 @@ class RequestHandler(abc.ABC):
     def publish_and_ack(self, producer, topic_name, consumer, message, result_body):
         headers = message.headers() or []
         if self.is_first_service:
-            headers_dict = {k: v.decode('utf-8') if isinstance(v, bytes) else v for k, v in headers}
-            self.tracer.inject(self.tracer.active_span.context, Format.TEXT_MAP, headers_dict)
-            headers = [(k, str(v).encode('utf-8')) for k, v in headers_dict.items()]
+            headers = inject_trace_headers(headers)
 
         val_bytes = result_body.encode('utf-8') if isinstance(result_body, str) else result_body
         key_bytes = message.key()

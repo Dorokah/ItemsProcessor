@@ -18,6 +18,7 @@ class HBaseRequestsHandler(RequestHandler):
         self.hbase_host = config_provider.get_hbase_host()
         self.hbase_port = config_provider.get_hbase_port()
         self.table_name = config_provider.get_hbase_table_name()
+        self.hbase_timeout_ms = config_provider.get_hbase_timeout_ms()
         self.publish_topic = config_provider.get_publish_queue_name()
 
     @traced_consumer
@@ -56,7 +57,11 @@ class HBaseRequestsHandler(RequestHandler):
 
         connection = None
         try:
-            connection = happybase.Connection(host=self.hbase_host, port=self.hbase_port)
+            connection = happybase.Connection(
+                host=self.hbase_host,
+                port=self.hbase_port,
+                timeout=self.hbase_timeout_ms,
+            )
             connection.open()
             self._ensure_table(connection)
             table = connection.table(self.table_name)

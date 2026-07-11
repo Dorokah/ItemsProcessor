@@ -152,7 +152,7 @@ def get_algorithm_service_post_timeout():
     return get_service_post_timeout()
 
 
-#  Jaeger support:
+#  Tracing support:
 def get_tracing_enable():
     return return_true_by_str(os.environ.get('TRACING_ENABLE', ''))
 

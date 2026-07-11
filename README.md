@@ -46,7 +46,7 @@ graph TD
 1. **High Concurrency & Multi-Threading**: Out-of-the-box asynchronous OS thread pool handling incoming messages, maximizing I/O performance (e.g. database writes, HTTP calls) without blocking the consumption loop.
 2. **Flexible Request Handler Abstraction**: A base `RequestHandler` template managing transaction setup, logging, distributed tracing propagation, error capture, and output queue publication.
 3. **Structured Telemetry (ELK integration)**: Structured JSON-based logging to Logstash which directly populates Elasticsearch, avoiding raw text logs and allowing rich dashboard filters.
-4. **Distributed Tracing (OpenTracing/Tempo)**: Automatic injection and propagation of OpenTracing-compliant headers across Kafka topics. The entire multi-service flow is linked under a single distributed trace.
+4. **Distributed Tracing (OpenTelemetry/Tempo)**: W3C `traceparent` propagation across Kafka topics, per-item traces after the splitter, and span links for batch operations.
 5. **Modern Explore UI Support**: Modern Grafana URL integration supporting direct trace-to-logs navigation in a new tab.
 
 ---
@@ -151,8 +151,8 @@ Configure your service in [docker-compose.yml](file:///Users/dorokah/Documents/c
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
 ```
 
 ---
@@ -165,10 +165,12 @@ This repository includes a full observability suite powered by the **LGTM** (Lok
 * Every request execution emits structured metadata logs containing `serviceName`, `pipelineName`, `requestId`, `entityId`, `traceId`, `processingDuration`, and `statusType` (`processingSuccess` / `processingError`).
 * Logstash maps and index-partitions these logs in Elasticsearch (`rabbitprocessor-YYYY.MM.DD`).
 
-### 2. Distributed Tracing (Tempo + OpenTracing)
-* The entrypoint initializes a Jaeger-compatible distributed tracer.
-* When a message enters the pipeline, a root span is created. Spans and trace headers are injected into Kafka headers and propagated downstream.
-* Tempo collects UDP compact Thrift traces at port `6831`.
+### 2. Distributed Tracing (Tempo + OpenTelemetry)
+* The entrypoint initializes an OpenTelemetry tracer.
+* The splitter creates one trace for the original JSON and then a new trace for every split Pokemon item.
+* Kafka headers carry W3C `traceparent` plus searchable fields such as `pokemon.id`, `jsonTrace`, and `splitter.id`.
+* Batch spans use OpenTelemetry span links to connect to item traces.
+* Tempo receives OTLP HTTP traces at port `4318`.
 
 ### 3. Grafana Dashboard (Logs-to-Trace Navigation)
 * Grafana serves the `rabbitprocessor-overview` dashboard at `http://localhost:3000`.
@@ -189,7 +191,7 @@ This repository includes a full observability suite powered by the **LGTM** (Lok
   ```yaml
   dataLinks:
     - field: "traceId"
-      url: 'http://localhost:3000/explore?schemaVersion=1&panes={"tp":{"datasource":"tempo-ds","queries":[{"refId":"A","queryType":"traceql","query":"$${__value.raw}","datasource":{"type":"tempo","uid":"tempo-ds"},"limit":20,"tableType":"traces"}],"range":{"from":"now-6h","to":"now"}}}&orgId=1'
+      url: 'http://localhost:3000/explore?schemaVersion=1&panes={"tp":{"datasource":"tempo-ds","queries":[{"refId":"A","queryType":"traceId","query":"$${__value.raw}","datasource":{"type":"tempo","uid":"tempo-ds"},"limit":20,"tableType":"traces"}],"range":{"from":"now-6h","to":"now"}}}&orgId=1'
       targetBlank: true
   ```
 
@@ -229,8 +231,6 @@ The application is configured using environment variables defined in [src/utils/
    ```
 2. Install project dependencies:
    ```bash
-   uv pip install tornado==6.5.7 jaeger-client==4.8.0
-   uv pip install --no-deps opentracing-instrumentation==3.3.1
    uv pip install -r deps/requirements.txt
    ```
 3. Set environment variables and run locally:

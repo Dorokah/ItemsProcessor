@@ -3,7 +3,7 @@ import time
 import uuid
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer, inject_trace_headers, start_item_span, get_active_trace_id
+from src.utils.tracer import traced_consumer, inject_trace_headers, start_item_span, get_active_trace_id, now_ms
 
 
 class SplitRequestsHandler(RequestHandler):
@@ -40,12 +40,14 @@ class SplitRequestsHandler(RequestHandler):
                 for pokemon in pokedex:
                     pokemon_str = json.dumps(pokemon)
                     key_str = str(pokemon.get('id', ''))
+                    split_ts_ms = now_ms()
                     with start_item_span(
                         "split_pokemon_item",
                         key_str,
                         splitter_id=splitter_id,
                         json_trace_id=json_trace_id,
                         new_trace=True,
+                        split_ts_ms=split_ts_ms,
                     ):
                         producer.produce(
                             topic=self.publish_topic,
@@ -55,6 +57,7 @@ class SplitRequestsHandler(RequestHandler):
                                 item_id=key_str,
                                 splitter_id=splitter_id,
                                 json_trace_id=json_trace_id,
+                                split_ts_ms=split_ts_ms,
                             )
                         )
                     produced_count += 1

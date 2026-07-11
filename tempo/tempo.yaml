@@ -3,10 +3,12 @@ server:
 
 distributor:
   receivers:
-    jaeger:
+    otlp:
       protocols:
-        thrift_compact:
-          endpoint: 0.0.0.0:6831
+        http:
+          endpoint: 0.0.0.0:4318
+        grpc:
+          endpoint: 0.0.0.0:4317
 
 ingester:
   lifecycler:

@@ -1,19 +1,3 @@
-import sys
-from types import ModuleType
-
-# Mock tornado.stack_context for compatibility of opentracing with Tornado 6
-import tornado
-_mod = ModuleType('tornado.stack_context')
-class _DummyStackContext:
-    def __init__(self, *args, **kwargs): pass
-    def __enter__(self): return self
-    def __exit__(self, *args): pass
-_mod.StackContext = _DummyStackContext
-_mod.ExceptionStackContext = _DummyStackContext
-_mod.wrap = lambda f: f
-sys.modules['tornado.stack_context'] = _mod
-tornado.stack_context = _mod
-
 import signal
 import time
 from confluent_kafka import Consumer, Producer

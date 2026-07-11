@@ -7,7 +7,8 @@ services:
       - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
     ports:
       - "3200:3200"   # HTTP API
-      - "6831:6831/udp" # Jaeger thrift compact UDP
+      - "4318:4318" # OTLP HTTP
+      - "4317:4317" # OTLP gRPC
 
   grafana:
     image: grafana/grafana:10.4.1
@@ -131,14 +132,14 @@ services:
       - CONSUME_TOPIC=pokedex-raw
       - PUBLISH_TOPIC=pokemon-individual
       - SERVICE_NAME=splitter
-      - BATCH_SIZE=3
+      - BATCH_SIZE=22
       - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
 
   pokemon-surname-generator-service:
     build:
@@ -164,8 +165,8 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
     entrypoint: ["python3", "-m", "src.pokemon_surname_generator"]
 
   surname-api-service:
@@ -187,8 +188,8 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
     entrypoint: ["python3", "-m", "src.surname_api"]
 
   surname-enrichment-service:
@@ -210,14 +211,14 @@ services:
       - PUBLISH_TOPIC=pokemon-ecriched
       - SURNAME_API_URL=http://surname-api-service:8066
       - SERVICE_NAME=surname-enrichment
-      - BATCH_SIZE=3
+      - BATCH_SIZE=22
       - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
 
   hbase-writer-service:
     build:
@@ -239,16 +240,17 @@ services:
       - HBASE_HOST=hbase
       - HBASE_PORT=9090
       - HBASE_TABLE_NAME=pokemon
+      - HBASE_TIMEOUT_MS=5000
       - SERVICE_NAME=hbase-writer
-      - BATCH_SIZE=2
+      - BATCH_SIZE=13
       - BATCH_TIMEOUT_SECONDS=1.0
       - MAX_WORKER_THREADS=4
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
 
   hbase-surname-updater-service:
     build:
@@ -271,15 +273,15 @@ services:
       - HBASE_TABLE_NAME=pokemon
       - HBASE_TIMEOUT_MS=5000
       - SERVICE_NAME=hbase-surname-updater
-      - BATCH_SIZE=2
+      - BATCH_SIZE=13
       - BATCH_TIMEOUT_SECONDS=1.0
       - MAX_WORKER_THREADS=2
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
 
   webhook-service:
     build:
@@ -299,14 +301,14 @@ services:
       - CONSUME_TOPIC=hbase-status
       - WEBHOOK_URL=http://webhook-mock/post
       - SERVICE_NAME=webhook
-      - BATCH_SIZE=3
+      - BATCH_SIZE=22
       - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
+      - MAX_BATCH_SPAN_LINKS=100
 
   hbase-browser:
     build:

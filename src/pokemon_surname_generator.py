@@ -6,11 +6,16 @@ import sys
 import time
 from datetime import datetime, timezone
 
-import opentracing
 from confluent_kafka import Producer
 
 from src.utils.service_logger import ServiceLogger
-from src.utils.tracer import init_tracer, inject_trace_headers, set_active_span_item_tags
+from src.utils.tracer import (
+    init_tracer,
+    inject_trace_headers,
+    set_active_span_item_tags,
+    set_current_span_error,
+    start_span,
+)
 
 
 SURNAMES = [
@@ -82,8 +87,7 @@ def main():
             "generatedAt": datetime.now(timezone.utc).isoformat(),
         }
 
-        with opentracing.global_tracer().start_active_span("generate_pokemon_surname") as scope:
-            span = scope.span
+        with start_span("generate_pokemon_surname"):
             set_active_span_item_tags([pokemon_id])
 
             service_logger.reset_aggregated_log()
@@ -105,7 +109,7 @@ def main():
                 service_logger.info(f"Generated surname for Pokemon ID {pokemon_id}: {surname}")
                 service_logger.log_success_logstash(start_timestamp)
             except Exception as exc:
-                span.set_tag("error", True)
+                set_current_span_error(str(exc))
                 service_logger.log_error(str(exc), start_timestamp)
 
         for _ in range(interval_seconds):

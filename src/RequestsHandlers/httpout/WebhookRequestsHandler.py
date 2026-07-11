@@ -3,7 +3,7 @@ import requests
 import time
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import config_provider
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import traced_consumer, get_message_split_ts_ms, now_ms
 
 
 class WebhookRequestsHandler(RequestHandler):
@@ -25,6 +25,9 @@ class WebhookRequestsHandler(RequestHandler):
             # Setup logging metadata fields
             self.service_logger.add_field('requestId', f"webhook-{pokemon_id}")
             self.service_logger.add_field('entityId', pokemon_id)
+            split_ts_ms = get_message_split_ts_ms(message)
+            if split_ts_ms:
+                self.service_logger.add_field('splitToWebhookDurationMs', now_ms() - int(split_ts_ms))
             self.service_logger.info(f"Received status update for Pokemon ID {pokemon_id}: {status}")
 
             self.service_logger.info(f"POSTing status to Webhook URL: {self.webhook_url}")

@@ -1,19 +1,21 @@
 import os
 import time
 
-import opentracing
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
-from opentracing import Format
 
 from src.utils.service_logger import ServiceLogger
 from src.utils.tracer import (
     HTTP_ITEM_ID_HEADER,
     ITEM_ID_HEADER,
     JSON_TRACE_ID_HEADER,
+    JSON_TRACE_ALIAS_HEADER,
+    extract_text_map_context,
     init_tracer,
     set_active_span_item_tags,
     set_active_span_json_trace_tags,
+    set_current_span_error,
+    start_span,
 )
 
 
@@ -56,41 +58,15 @@ def translate_surname(surname):
 
 
 def get_parent_context(request):
-    try:
-        return opentracing.global_tracer().extract(
-            Format.HTTP_HEADERS,
-            {key: value for key, value in request.headers.items()},
-        )
-    except Exception:
-        return None
-
-
-def get_context_item_id(context):
-    if not context:
-        return None
-
-    try:
-        return context.get_baggage_item(ITEM_ID_HEADER)
-    except Exception:
-        return None
+    return extract_text_map_context({key: value for key, value in request.headers.items()})
 
 
 def get_request_item_id(request, context):
-    return request.headers.get(HTTP_ITEM_ID_HEADER) or get_context_item_id(context)
-
-
-def get_context_json_trace_id(context):
-    if not context:
-        return None
-
-    try:
-        return context.get_baggage_item(JSON_TRACE_ID_HEADER)
-    except Exception:
-        return None
+    return request.headers.get(HTTP_ITEM_ID_HEADER) or request.headers.get(ITEM_ID_HEADER)
 
 
 def get_request_json_trace_id(request, context):
-    return request.headers.get(JSON_TRACE_ID_HEADER) or get_context_json_trace_id(context)
+    return request.headers.get(JSON_TRACE_ID_HEADER) or request.headers.get(JSON_TRACE_ALIAS_HEADER)
 
 
 @app.get("/health")
@@ -111,11 +87,10 @@ def translate(request: Request, surname: str = Query(..., min_length=1)):
     pokemon_id = get_request_item_id(request, parent_context)
     json_trace_id = get_request_json_trace_id(request, parent_context)
 
-    with opentracing.global_tracer().start_active_span(
+    with start_span(
         "surname_api_translate",
-        child_of=parent_context,
-    ) as scope:
-        span = scope.span
+        parent_context=parent_context,
+    ):
         if pokemon_id:
             set_active_span_item_tags([pokemon_id])
         if json_trace_id:
@@ -142,7 +117,7 @@ def translate(request: Request, surname: str = Query(..., min_length=1)):
                 "frenchName": french_name,
             }
         except HTTPException as exc:
-            span.set_tag("error", True)
+            set_current_span_error(str(exc.detail))
             logger.log_error(str(exc.detail), start_timestamp)
             raise
 

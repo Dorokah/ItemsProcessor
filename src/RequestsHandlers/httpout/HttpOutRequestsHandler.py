@@ -2,10 +2,9 @@ import json
 import time
 import traceback
 import requests
-from opentracing_instrumentation import traced_function
 from src.RequestsHandlers.RequestHandler import RequestHandler
 from src.utils import result_builder
-from src.utils.tracer import traced_consumer
+from src.utils.tracer import traced_consumer, traced_function
 from src.utils.service_logger import ServiceLogger
 
 
