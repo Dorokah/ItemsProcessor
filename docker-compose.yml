@@ -7,8 +7,7 @@ services:
       - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
     ports:
       - "3200:3200"   # HTTP API
-      - "4318:4318" # OTLP HTTP
-      - "4317:4317" # OTLP gRPC
+      - "6831:6831/udp" # Jaeger thrift compact UDP
 
   grafana:
     image: grafana/grafana:10.4.1
@@ -26,23 +25,6 @@ services:
     depends_on:
       - tempo
 
-  pokemon-trace-dashboard:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: pokemon-trace-dashboard
-    depends_on:
-      - tempo
-      - grafana
-    ports:
-      - "8090:8090"
-    environment:
-      - PORT=8090
-      - TEMPO_URL=http://tempo:3200
-      - GRAFANA_URL=http://localhost:3000
-      - TRACE_DASHBOARD_LOOKBACK_SECONDS=21600
-    entrypoint: ["python3", "-m", "src.pokemon_trace_dashboard"]
-
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.4.3
     container_name: elasticsearch
@@ -56,10 +38,11 @@ services:
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9200'"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null || exit 1"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   logstash:
     image: docker.elastic.co/logstash/logstash:9.4.3
@@ -103,6 +86,34 @@ services:
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
       - KAFKA_MESSAGE_MAX_BYTES=10000000
 
+  kafka-init:
+    image: apache/kafka:latest
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_started
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+        echo "Waiting for Kafka to accept connections...";
+        sleep 2;
+      done;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic pokedex-raw --partitions 1 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic pokemon-individual --partitions 1 --replication-factor 1;
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic hbase-status --partitions 1 --replication-factor 1;
+      echo "Kafka topics ready"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8082:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+
   hbase:
     image: harisekhon/hbase:1.4
     container_name: hbase
@@ -124,6 +135,8 @@ services:
     depends_on:
       kafka:
         condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
       logstash:
         condition: service_started
     environment:
@@ -132,93 +145,12 @@ services:
       - CONSUME_TOPIC=pokedex-raw
       - PUBLISH_TOPIC=pokemon-individual
       - SERVICE_NAME=splitter
-      - BATCH_SIZE=22
-      - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
-
-  pokemon-surname-generator-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: pokemon-surname-generator-service
-    depends_on:
-      kafka:
-        condition: service_started
-      logstash:
-        condition: service_started
-      tempo:
-        condition: service_started
-    volumes:
-      - ./pokedex.json:/app/pokedex.json:ro
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - PUBLISH_TOPIC=pokemon-surnames
-      - POKEDEX_FILE_PATH=/app/pokedex.json
-      - SURNAME_GENERATION_INTERVAL_SECONDS=60
-      - SERVICE_NAME=pokemon-surname-generator
-      - LOGSTASH_ENABLE=True
-      - LOGSTASH_HOST=logstash
-      - LOGSTASH_PORT=5044
-      - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
-    entrypoint: ["python3", "-m", "src.pokemon_surname_generator"]
-
-  surname-api-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: surname-api-service
-    depends_on:
-      logstash:
-        condition: service_started
-      tempo:
-        condition: service_started
-    ports:
-      - "8066:8066"
-    environment:
-      - PORT=8066
-      - SERVICE_NAME=surname-api
-      - LOGSTASH_ENABLE=True
-      - LOGSTASH_HOST=logstash
-      - LOGSTASH_PORT=5044
-      - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
-    entrypoint: ["python3", "-m", "src.surname_api"]
-
-  surname-enrichment-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: surname-enrichment-service
-    depends_on:
-      kafka:
-        condition: service_started
-      surname-api-service:
-        condition: service_started
-      logstash:
-        condition: service_started
-    environment:
-      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.SurnameEnrichmentRequestsHandler
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - CONSUME_TOPIC=pokemon-surnames
-      - PUBLISH_TOPIC=pokemon-ecriched
-      - SURNAME_API_URL=http://surname-api-service:8066
-      - SERVICE_NAME=surname-enrichment
-      - BATCH_SIZE=22
-      - BATCH_TIMEOUT_SECONDS=1.0
-      - LOGSTASH_ENABLE=True
-      - LOGSTASH_HOST=logstash
-      - LOGSTASH_PORT=5044
-      - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
 
   hbase-writer-service:
     build:
@@ -228,6 +160,8 @@ services:
     depends_on:
       kafka:
         condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
       hbase:
         condition: service_started
       logstash:
@@ -240,48 +174,13 @@ services:
       - HBASE_HOST=hbase
       - HBASE_PORT=9090
       - HBASE_TABLE_NAME=pokemon
-      - HBASE_TIMEOUT_MS=5000
       - SERVICE_NAME=hbase-writer
-      - BATCH_SIZE=13
-      - BATCH_TIMEOUT_SECONDS=1.0
-      - MAX_WORKER_THREADS=4
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
-
-  hbase-surname-updater-service:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: hbase-surname-updater-service
-    depends_on:
-      kafka:
-        condition: service_started
-      hbase:
-        condition: service_started
-      logstash:
-        condition: service_started
-    environment:
-      - REQUEST_HANDLER=src.RequestsHandlers.pipeline.HBaseSurnameUpdateRequestsHandler
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - CONSUME_TOPIC=pokemon-ecriched
-      - HBASE_HOST=hbase
-      - HBASE_PORT=9090
-      - HBASE_TABLE_NAME=pokemon
-      - HBASE_TIMEOUT_MS=5000
-      - SERVICE_NAME=hbase-surname-updater
-      - BATCH_SIZE=13
-      - BATCH_TIMEOUT_SECONDS=1.0
-      - MAX_WORKER_THREADS=2
-      - LOGSTASH_ENABLE=True
-      - LOGSTASH_HOST=logstash
-      - LOGSTASH_PORT=5044
-      - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
 
   webhook-service:
     build:
@@ -291,6 +190,8 @@ services:
     depends_on:
       kafka:
         condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
       webhook-mock:
         condition: service_started
       logstash:
@@ -301,14 +202,12 @@ services:
       - CONSUME_TOPIC=hbase-status
       - WEBHOOK_URL=http://webhook-mock/post
       - SERVICE_NAME=webhook
-      - BATCH_SIZE=22
-      - BATCH_TIMEOUT_SECONDS=1.0
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
-      - MAX_BATCH_SPAN_LINKS=100
+      - JAEGER_AGENT_HOST=tempo
+      - JAEGER_AGENT_PORT=6831
 
   hbase-browser:
     build:

@@ -1,107 +1,131 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-KAFKA_SERVICE="${KAFKA_SERVICE:-kafka}"
-HBASE_SERVICE="${HBASE_SERVICE:-hbase}"
-HBASE_CLIENT_SERVICE="${HBASE_CLIENT_SERVICE:-hbase-browser}"
 HBASE_TABLE_NAME="${HBASE_TABLE_NAME:-pokemon}"
+HBASE_CONTAINER="${HBASE_CONTAINER:-hbase}"
+KAFKA_CONTAINER="${KAFKA_CONTAINER:-kafka}"
+KAFKA_BOOTSTRAP_SERVER="${KAFKA_BOOTSTRAP_SERVER:-localhost:9092}"
+KAFKA_TOPICS="${KAFKA_TOPICS:-pokedex-raw pokemon-individual hbase-status}"
 
-is_hbase_healthy() {
-  docker compose exec -T "$HBASE_SERVICE" sh -c "ps aux | grep -q '[D]proc_master' && ps aux | grep -q '[D]proc_regionserver' && ps aux | grep -q '[D]proc_thrift'" >/dev/null 2>&1
-  docker compose exec -T "$HBASE_CLIENT_SERVICE" python3 -c "import happybase, os; c=happybase.Connection(host=os.environ.get('HBASE_HOST', 'hbase'), port=int(os.environ.get('HBASE_PORT', '9090')), timeout=10000); c.open(); c.tables(); c.close()" >/dev/null 2>&1
-}
+echo "Resetting pipeline state..."
+echo "HBase table: ${HBASE_TABLE_NAME}"
+echo "Kafka topics: ${KAFKA_TOPICS}"
 
-ensure_hbase_ready() {
-  echo "Checking HBase health..."
-  if is_hbase_healthy; then
-    echo "HBase is healthy."
-    return 0
-  fi
-
-  echo "HBase is not healthy. Running init script..."
-  bash "$(dirname "${BASH_SOURCE[0]}")/init_hbase.sh"
-
-  echo "Checking HBase health after init..."
-  is_hbase_healthy
-}
-
-echo "Clearing Kafka topic messages..."
-docker compose exec -T "$KAFKA_SERVICE" bash -lc '
+echo
+echo "Clearing all rows from HBase table '${HBASE_TABLE_NAME}' without dropping the table..."
+docker compose exec -T "${HBASE_CONTAINER}" bash -s -- "${HBASE_TABLE_NAME}" <<'EOF'
 set -euo pipefail
 
-BOOTSTRAP="${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
-TOPICS=$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" --list | grep -v "^__" || true)
+TABLE_NAME="$1"
+SCRIPT_PATH="/tmp/clear_hbase_table.rb"
 
-if [ -z "$TOPICS" ]; then
-  echo "No Kafka topics found to clear."
-  exit 0
-fi
+cat > "${SCRIPT_PATH}" <<'RUBY'
+include Java
 
-for topic in $TOPICS; do
-  echo "Clearing Kafka topic: $topic"
-  offsets=$(/opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$BOOTSTRAP" --topic "$topic" --time -1 2>/dev/null || true)
+import org.apache.hadoop.hbase.HBaseConfiguration
+import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.client.ConnectionFactory
+import org.apache.hadoop.hbase.client.Delete
+import org.apache.hadoop.hbase.client.Scan
 
-  if [ -z "$offsets" ]; then
-    echo "  No partitions found for topic $topic."
-    continue
-  fi
+table_name = TableName.valueOf(ARGV[0])
+config = HBaseConfiguration.create
+connection = ConnectionFactory.createConnection(config)
+admin = connection.getAdmin
 
-  json="{\"partitions\":["
-  first=1
-  while IFS=: read -r topic_name partition offset; do
-    if [ -z "${topic_name:-}" ] || [ -z "${partition:-}" ] || [ -z "${offset:-}" ]; then
-      continue
-    fi
-    if [ "$first" -eq 0 ]; then
-      json="$json,"
-    fi
-    json="$json{\"topic\":\"$topic_name\",\"partition\":$partition,\"offset\":$offset}"
-    first=0
-  done <<EOF
-$offsets
+begin
+  unless admin.tableExists(table_name)
+    raise "HBase table '#{ARGV[0]}' does not exist"
+  end
+
+  table = connection.getTable(table_name)
+  scanner = table.getScanner(Scan.new)
+  deleted_rows = 0
+
+  begin
+    scanner.each do |result|
+      table.delete(Delete.new(result.getRow))
+      deleted_rows += 1
+    end
+  ensure
+    scanner.close
+    table.close
+  end
+
+  puts "Deleted #{deleted_rows} rows from '#{ARGV[0]}'. Table was preserved."
+ensure
+  admin.close
+  connection.close
+end
+RUBY
+
+hbase shell -n "${SCRIPT_PATH}" "${TABLE_NAME}"
+rm -f "${SCRIPT_PATH}"
 EOF
-  json="$json],\"version\":1}"
 
-  if [ "$first" -eq 1 ]; then
-    echo "  No offsets found for topic $topic."
+echo
+echo "Removing Kafka messages from topics without deleting the topics..."
+docker compose exec -T "${KAFKA_CONTAINER}" bash -s -- "${KAFKA_BOOTSTRAP_SERVER}" ${KAFKA_TOPICS} <<'EOF'
+set -euo pipefail
+
+BOOTSTRAP_SERVER="$1"
+shift
+
+find_kafka_tool() {
+  local tool_name="$1"
+  local path
+
+  path="$(command -v "${tool_name}" || true)"
+  if [[ -n "${path}" ]]; then
+    echo "${path}"
+    return
+  fi
+
+  path="$(find /opt /usr -name "${tool_name}" -type f 2>/dev/null | head -n 1 || true)"
+  if [[ -n "${path}" ]]; then
+    echo "${path}"
+    return
+  fi
+
+  echo "Could not find ${tool_name} in Kafka container" >&2
+  exit 1
+}
+
+KAFKA_TOPICS_SH="$(find_kafka_tool kafka-topics.sh)"
+KAFKA_GET_OFFSETS_SH="$(find_kafka_tool kafka-get-offsets.sh)"
+KAFKA_DELETE_RECORDS_SH="$(find_kafka_tool kafka-delete-records.sh)"
+
+for TOPIC in "$@"; do
+  if ! "${KAFKA_TOPICS_SH}" --bootstrap-server "${BOOTSTRAP_SERVER}" --list | grep -Fxq "${TOPIC}"; then
+    echo "Skipping missing Kafka topic '${TOPIC}'."
     continue
   fi
 
-  printf "%s\n" "$json" > /tmp/delete-records.json
-  /opt/kafka/bin/kafka-delete-records.sh --bootstrap-server "$BOOTSTRAP" --offset-json-file /tmp/delete-records.json
+  OFFSETS_FILE="/tmp/delete-records-${TOPIC}.json"
+  OFFSETS="$("${KAFKA_GET_OFFSETS_SH}" --bootstrap-server "${BOOTSTRAP_SERVER}" --topic "${TOPIC}" --time -1)"
+
+  if [[ -z "${OFFSETS}" ]]; then
+    echo "Topic '${TOPIC}' has no partitions to clear."
+    continue
+  fi
+
+  printf '{"partitions":[' > "${OFFSETS_FILE}"
+  FIRST_PARTITION=1
+  while IFS=: read -r OFFSET_TOPIC PARTITION OFFSET; do
+    if [[ "${FIRST_PARTITION}" -eq 0 ]]; then
+      printf ',' >> "${OFFSETS_FILE}"
+    fi
+
+    printf '{"topic":"%s","partition":%s,"offset":%s}' "${OFFSET_TOPIC}" "${PARTITION}" "${OFFSET}" >> "${OFFSETS_FILE}"
+    FIRST_PARTITION=0
+  done <<< "${OFFSETS}"
+  printf '],"version":1}\n' >> "${OFFSETS_FILE}"
+
+  "${KAFKA_DELETE_RECORDS_SH}" --bootstrap-server "${BOOTSTRAP_SERVER}" --offset-json-file "${OFFSETS_FILE}"
+  rm -f "${OFFSETS_FILE}"
+  echo "Cleared messages from Kafka topic '${TOPIC}'."
 done
-'
+EOF
 
-ensure_hbase_ready
-
-echo "Deleting all HBase rows from table: $HBASE_TABLE_NAME"
-docker compose exec -T "$HBASE_CLIENT_SERVICE" python3 -c "
-import happybase
-import os
-
-host = os.environ.get('HBASE_HOST', 'hbase')
-port = int(os.environ.get('HBASE_PORT', '9090'))
-table_name = os.environ.get('HBASE_TABLE_NAME', '$HBASE_TABLE_NAME')
-
-connection = happybase.Connection(host=host, port=port, timeout=10000)
-connection.open()
-
-if table_name.encode('utf-8') not in connection.tables():
-    print(f'HBase table {table_name} does not exist; nothing to clear.')
-    connection.close()
-    raise SystemExit(0)
-
-table = connection.table(table_name)
-deleted = 0
-batch = table.batch(batch_size=100)
-
-for row_key, _ in table.scan():
-    batch.delete(row_key)
-    deleted += 1
-
-batch.send()
-connection.close()
-print(f'Deleted {deleted} rows from HBase table {table_name}.')
-"
-
+echo
 echo "Pipeline state reset complete."
