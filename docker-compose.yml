@@ -7,7 +7,7 @@ services:
       - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
     ports:
       - "3200:3200"   # HTTP API
-      - "6831:6831/udp" # Jaeger thrift compact UDP
+      - "4318:4318"   # OTLP HTTP
 
   grafana:
     image: grafana/grafana:10.4.1
@@ -149,8 +149,7 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
 
   hbase-writer-service:
     build:
@@ -172,15 +171,14 @@ services:
       - CONSUME_TOPIC=pokemon-individual
       - PUBLISH_TOPIC=hbase-status
       - HBASE_HOST=hbase
-      - HBASE_PORT=9090
+      - HBASE_ZOOKEEPER_PORT=2181
       - HBASE_TABLE_NAME=pokemon
       - SERVICE_NAME=hbase-writer
       - LOGSTASH_ENABLE=True
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
 
   webhook-service:
     build:
@@ -206,8 +204,7 @@ services:
       - LOGSTASH_HOST=logstash
       - LOGSTASH_PORT=5044
       - TRACING_ENABLE=True
-      - JAEGER_AGENT_HOST=tempo
-      - JAEGER_AGENT_PORT=6831
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://tempo:4318/v1/traces
 
   hbase-browser:
     build:
@@ -221,9 +218,10 @@ services:
       - "8081:8081"
     environment:
       - HBASE_HOST=hbase
-      - HBASE_PORT=9090
+      - HBASE_ZOOKEEPER_PORT=2181
       - HBASE_TABLE_NAME=pokemon
-    entrypoint: ["python3", "src/hbase_browser.py"]
+      - APP_MODE=web
+      - PORT=8081
 
 volumes:
   elasticsearch-data:

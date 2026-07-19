@@ -8,7 +8,7 @@ HBASE_HEALTH_SLEEP_SECONDS="${HBASE_HEALTH_SLEEP_SECONDS:-5}"
 
 is_hbase_healthy() {
   docker compose exec -T "$HBASE_SERVICE" sh -c "ps aux | grep -q '[D]proc_master' && ps aux | grep -q '[D]proc_regionserver' && ps aux | grep -q '[D]proc_thrift'" >/dev/null 2>&1
-  docker compose exec -T "$HBASE_CLIENT_SERVICE" python3 -c "import happybase, os; c=happybase.Connection(host=os.environ.get('HBASE_HOST', 'hbase'), port=int(os.environ.get('HBASE_PORT', '9090')), timeout=10000); c.open(); c.tables(); c.close()" >/dev/null 2>&1
+  docker compose exec -T "$HBASE_CLIENT_SERVICE" wget -qO- http://localhost:8081/api/hbase/pokemon >/dev/null 2>&1
 }
 
 echo "Initializing HBase..."

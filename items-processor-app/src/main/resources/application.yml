@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: ${SERVICE_NAME:items-processor}
+  main:
+    web-application-type: reactive
+server:
+  port: ${PORT:8080}
+management:
+  endpoints.web.exposure.include: health,info
+
+pipeline:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    group-id: ${KAFKA_GROUP_ID:${SERVICE_NAME:items-processor}}
+    batch-size: ${BATCH_SIZE:100}
+    batch-timeout: ${BATCH_TIMEOUT:1s}
+    concurrency: ${MAX_WORKER_THREADS:4}
+  hbase:
+    quorum: ${HBASE_HOST:localhost}
+    client-port: ${HBASE_ZOOKEEPER_PORT:2181}
+    table: ${HBASE_TABLE_NAME:pokemon}
+  tracing:
+    enabled: ${TRACING_ENABLE:true}
+    service-name: ${SERVICE_NAME:items-processor}
+    endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+    max-batch-links: ${MAX_BATCH_SPAN_LINKS:100}
+
+items:
+  request-handler: ${REQUEST_HANDLER:src.RequestsHandlers.pipeline.SplitRequestsHandler}
+  consume-topic: ${CONSUME_TOPIC:pokedex-raw}
+  publish-topic: ${PUBLISH_TOPIC:pokemon-individual}
+  webhook-url: ${WEBHOOK_URL:http://localhost:8080/post}
+  surname-api-url: ${SURNAME_API_URL:http://localhost:8066}
+  mode: ${APP_MODE:pipeline}
+  pokedex-file: ${POKEDEX_FILE_PATH:pokedex.json}
+  surname-interval-seconds: ${SURNAME_GENERATION_INTERVAL_SECONDS:60}
+  tempo-url: ${TEMPO_URL:http://localhost:3200}
+  grafana-url: ${GRAFANA_URL:http://localhost:3000}
